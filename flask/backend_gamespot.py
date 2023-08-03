@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 import time
 
 from video_game import VideoGame, VideoGameCollection
+from tf_idf import get_fitted_train_matrix, get_unfitted_review_matrix
+from sklearn.metrics.pairwise import cosine_similarity
 
 """
 backend_gamespot.py
@@ -93,10 +95,6 @@ def main(query_string):
 
     # pdb.set_trace()
 
-    from tf_idf import get_fitted_train_matrix, get_unfitted_review_matrix
-
-    from sklearn.metrics.pairwise import cosine_similarity
-
     gamesData = game_collection.get_data()
 
     # find cosine similarity between each game and the query
@@ -140,7 +138,7 @@ def main(query_string):
     # TODO add error checks in case no games recommended
     # get images from names of recommended games - DONE
 
-    image_recs = {}
+    image_recs = []
     for k, v in game_title_ids.items():
         rec_url = "http://www.gamespot.com/api/games/?api_key=" + GAMESPOT_API_KEY + "&format=json" + \
         "&filter=id:" + str(v)
@@ -148,7 +146,11 @@ def main(query_string):
         rec_json = json.loads(rec_call.text)['results']
         # pdb.set_trace()
 
-        image_recs[rec_json[0]['name']] = rec_json[0]['image']['original'] 
+        rec = {}
+
+        rec['game'] = rec_json[0]['name']
+        rec['url'] = rec_json[0]['image']['original'] 
+        image_recs.append(rec)
         # {'Game name': 'https://www.gamespot.com/a/uploads/original/image.png'}
 
     # pdb.set_trace()
@@ -158,6 +160,10 @@ def main(query_string):
     elapsed_time = time.time() - start_time
     print("Time (seconds): ", elapsed_time)
 
-    return image_recs
+    placeholder = "x.jpg"
+    if len(image_recs) == 0:
+        return {'game name':  placeholder}
+
+    return image_recs[0]
 
 # main("cute artistic")
