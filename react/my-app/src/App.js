@@ -16,7 +16,7 @@ function App() {
 
     const [backendData, setBackendData] = useState([{}]);
 
-    function handleTransfer() {
+    async function handleTransfer() {
         fetch('/query', {
             method: 'POST',
             headers: { "Content-Type": "application/json" },
@@ -24,13 +24,18 @@ function App() {
         }).then(() => {
             console.log("POST: " + query)
         })
-  
-        fetch('/query').then(
-          response => response.json()
-        ).then(data => setBackendData(data)).then(() => {
-            console.log("GET: " + data)
-        })
+          
+        // https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
+        const response = await fetch("/query");
+        const games = await response.json();
+            console.log(games);
     }
+  
+        // fetch('/query').then(
+          // response => response.json()
+        // ).then(data => setBackendData(data)).then((data) => {
+           // console.log("GET: " + data)
+        // })
 
     return (
         
