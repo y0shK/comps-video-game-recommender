@@ -160,9 +160,9 @@ def main(query_string):
     elapsed_time = time.time() - start_time
     print("Time (seconds): ", elapsed_time)
 
-    placeholder = "x.jpg"
+    # account for no games found
     if len(image_recs) == 0:
-        return {'game name':  placeholder}
+        return {'game name':  'null'}
 
     return image_recs[0]
 
