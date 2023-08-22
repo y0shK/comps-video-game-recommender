@@ -21,10 +21,7 @@ function App() {
     const [recName, setRecName] = useState("");
     const [recImg, setRecImg] = useState("");
 
-
-
     // useEffect(() => { https://stackoverflow.com/questions/56247433/how-to-use-setstate-callback-on-react-hooks
-
     // https://stackoverflow.com/questions/72113386/reactjs-how-do-you-call-an-async-fuction-on-button-click
     // https://stackoverflow.com/questions/72113386/reactjs-how-do-you-call-an-async-fuction-on-button-click
     // https://stackoverflow.com/questions/71174509/proper-async-await-syntax-for-fetching-data-using-useeffect-hook-in-react
@@ -65,93 +62,71 @@ function App() {
     // https://stackoverflow.com/questions/51184136/display-an-image-from-url-in-reactjs
 
     // https://stackoverflow.com/questions/46966413/how-to-style-material-ui-textfield
-    const styles = theme => ({
-        textField: {
-            width: '90%',
-            marginLeft: 'auto',
-            marginRight: 'auto',            
-            paddingBottom: 0,
-            marginTop: 0,
-            fontWeight: 500,
-            alignItems: 'center'
-        },
-        input: {
-            color: 'white'
-        }
-    });
 
     //.MuiTextField-root {
   //align-items: center;
   //text-align: center;
 //}
 
-    const inputProps = {
-        textAlign: 'center'
-      };      
-
-    
-
     return (
-        
-        <div className="container">
+    <div className="container">
         <h1>Video Game Recommender</h1>
-       
+    
+        <Box
+        // box for textfield and button
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="5vh">
+        
+            <TextField 
+            // textfield inside box to center component
+            // https://stackoverflow.com/questions/56500234/how-can-i-center-align-material-ui-textfield-text-and-also-set-a-min-number-valu
+
+            InputProps={{
+                inputProps: {
+                    style: { textAlign: "center", alignItems: 'center', justifyContent: 'center'},  
+                }
+            }}
+            id="video_game_entry" 
+            label="Search" 
+            variant="outlined"
+            placeholder="video game keywords"
+            helperText="Please enter some keywords to get recommended video games."
+            type="text"
+            name="name"
+            onChange={onChangeHandler}
+            value={query}
+            alignItems='center'/>
+
+            <Button variant="text" onClick={handleTransfer}> Transfer Data </Button>
+        </Box>
 
         <Box
-  display="flex"
-  justifyContent="center"
-  alignItems="center"
-  minHeight="100vh"
->
-
-        <TextField 
-        // textfield inside box to center component
-        // https://stackoverflow.com/questions/56500234/how-can-i-center-align-material-ui-textfield-text-and-also-set-a-min-number-valu
-
-        InputProps={{
-            inputProps: {
-                 style: { textAlign: "center", alignItems: 'center', justifyContent: 'center'},
-                 
-            }
-        }}
-
-        // sx={{MuiTextField: {textAlign: "center"}}}
-
-        id="video_game_entry" 
-        
-        label="Search" 
-        variant="outlined"
-        placeholder="video game keywords"
-        helperText="Please enter some keywords to get recommended video games."
-        type="text"
-        name="name"
-        onChange={onChangeHandler}
-        value={query}
-        alignItems='center'
-
-   
-
-        // inputProps={inputProps}
-        />
+        display="flex"
+        justifyContent="center"
+        alignItems="center">
+        <h3>{backendData.query_body}</h3>
+            <h3>{recName}</h3>
         </Box>
         
-        <Button variant="text" onClick={handleTransfer}> Transfer Data </Button>
-
         <Box
-  display="flex"
-  justifyContent="center"
-  alignItems="center"
-  minHeight="100vh"
->
+        display="flex"
+        justifyContent="center"
+        alignItems="center" // vh: 5% of viewport height
+        
+        // <h3>{recName}</h3>
+        >
 
-        <h3>{backendData.query_body}</h3>
-        <h3>{recName}</h3>
-        <img 
-      src={recImg}
-      alt="boxart"
-      />
-    Test box
-</Box>
+            
+            <img 
+            src={recImg}
+            alt=""
+            height="50%"
+            width="50%"
+            />
+        </Box>
+        
         </div>
 
     );
