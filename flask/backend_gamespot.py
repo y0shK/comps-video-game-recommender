@@ -5,6 +5,8 @@ import os
 from dotenv import load_dotenv
 import time
 
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
 from video_game import VideoGame, VideoGameCollection
 from tf_idf import get_fitted_train_matrix, get_unfitted_review_matrix
 from sklearn.metrics.pairwise import cosine_similarity
@@ -77,10 +79,42 @@ def get_review_info(api_key, headers, offset):
 # wrap recommendation process into helper functions; then, if no recs found, lower cos similarity and try again
 
 """
+clean_user_query
+Clean the user query by removing stopwords, converting query to all lowercase, removing punctuation, etc.
+Arguments: query_string: str (user input that is provided in app.py)
+Returns: cleaned_query_string: str (remove stopwords with nltk)
+"""
+# TODO ensure no offensive content is entered
+
+def clean_user_query(query_string):
+    # nltk tokenize to get rid of query stopwords
+
+    # https://www.nltk.org/api/nltk.tokenize.html
+    # https://stackoverflow.com/questions/22763224/nltk-stopword-list
+
+    broken_query = word_tokenize(query_string)
+    stops = set(stopwords.words('english'))
+
+    clean_query = ""
+    for word in broken_query:
+        if word not in stops and word.isalnum(): # check non-stopword and alphanumeric
+            clean_query += word.lower() + " "
+    clean_query = clean_query.strip() # https://docs.python.org/3/library/stdtypes.html
+    
+    print("difference in cleanup")
+    print(clean_query)
+    print(query_string)
+
+    if clean_query:
+        return clean_query
+    else:
+        return query_string
+
+"""
 perform_vectorization
 Arguments: query_string: str (user input that is provided in app.py)
             cos_similarity_threshold: float (what value to assign for cos similarity of user vector/each review vector)
-Returns: game_title_ids: {} - key: game title, value: game id
+Returns: game_title_ids: {} - key: game title, value: {game id, cos similarity between user vector/review}
 """
 def perform_vectorization(query_string, cos_similarity_threshold):
 
@@ -137,26 +171,34 @@ def perform_vectorization(query_string, cos_similarity_threshold):
         review_content = [review_content]
         m = get_unfitted_review_matrix(user_query, review_content)
 
-        if cosine_similarity(user_matrix, m) >= cos_threshold:
-            game_title_ids[k] = v['id']
+        # https://stackoverflow.com/questions/61956463/extract-data-from-numpy-array-of-shape
+        # https://stackoverflow.com/questions/20457038/how-to-round-to-2-decimals-with-python
+        cos_sim = cosine_similarity(user_matrix, m) # gives array[[cos_sim]], extract cos_sim
+
+        if cos_sim >= cos_threshold:
+            cos_sim_value = round(float(cos_sim.item()), 2)
+            game_title_ids[k] = {'game_id': v['id'], 'game_input_cos_similarity': cos_sim_value}
 
     print("Recommended games: ")
     #print(game_title_ids.keys()) e.g., ['Pokemon Blue', 'Pokemon Silver']
-    #print(game_title_ids[list(game_title_ids.keys())[0]]) e.g., game_title_ids['Pokemon Blue'] = some_id
+    #print(game_title_ids[list(game_title_ids.keys())[0]]) 
+    # e.g., game_title_ids['Pokemon Blue'] = {some_id, some_cos_sim}
 
     return game_title_ids
 
 """
 extract_recommendations_from_vectors
-Arguments: game_title_ids: {} - {game title: game id to cross-reference with review}
-Returns: image_recs: {} - {game_id: 'game_id', url: 'url'}
+Arguments: game_title_ids: {} - {game title: {game id: game id to cross-reference with review,
+                                                cos similarity: float similarity between user vector/review}
+Returns: image_recs: list of dicts [{}, {}, ...]
+                         each dict is {game_id: 'game_id', url: 'url', cos_sim: x such that 0.0 <= x <= 1.0}
 """
 def extract_recommendations_from_vectors(game_title_ids):
 
     image_recs = []
     for k, v in game_title_ids.items():
         rec_url = "http://www.gamespot.com/api/games/?api_key=" + GAMESPOT_API_KEY + "&format=json" + \
-        "&filter=id:" + str(v)
+        "&filter=id:" + str(v['game_id'])
 
         print("rec_url")
         print(rec_url)
@@ -166,9 +208,9 @@ def extract_recommendations_from_vectors(game_title_ids):
         # pdb.set_trace()
 
         rec = {}
-
         rec['game'] = rec_json[0]['name']
-        rec['url'] = rec_json[0]['image']['original'] 
+        rec['url'] = rec_json[0]['image']['original']
+        rec['cos_sim'] = v['game_input_cos_similarity'] 
         image_recs.append(rec)
         # {'Game name': 'https://www.gamespot.com/a/uploads/original/image.png'}
 
@@ -189,17 +231,21 @@ def main(query_string, cos_similarity_threshold):
 
     cos_similarity_threshold = round(cos_similarity_threshold, 2)
 
-    game_title_ids = perform_vectorization(query_string=query_string, cos_similarity_threshold=cos_similarity_threshold)
+    rec_string = clean_user_query(query_string)
+    game_title_ids = perform_vectorization(query_string=rec_string, cos_similarity_threshold=cos_similarity_threshold)
     image_recs = extract_recommendations_from_vectors(game_title_ids=game_title_ids)
     
     # https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution
     elapsed_time = time.time() - start_time
     print("Time (seconds): ", elapsed_time)
 
+    # https://stackoverflow.com/questions/5320871/how-to-find-the-min-max-value-of-a-common-key-in-a-list-of-dicts
+
     # recursive call of main()
-    if len(image_recs) > 0: # base case 1. we have a recommendation
-        print("cos similarity: ", cos_similarity_threshold)
-        return image_recs[0]
+    if len(image_recs) > 0: # base case 1. we have a recommendation. return the most salient one
+        print("current cos similarity threshold: ", cos_similarity_threshold)
+        print(max(image_recs, key = lambda x : x['cos_sim']))
+        return max(image_recs, key = lambda x : x['cos_sim'])
     # base case 2. we have no possible recommendation. this is like Google saying "no results found"
     if round(cos_similarity_threshold, 2) == 0.0: 
         return {'game name': 'null', 'url': 'null'}
@@ -210,9 +256,14 @@ def main(query_string, cos_similarity_threshold):
 Test cases.
 (Actual call to main() is in app.py in flask backend)
 """
+# main("cute artistic", 0.75)
 # main("masterpiece aesthetic gothic", 0.75)
 # main("challenging atmospheric", 0.8)
 # main("accessible cozy comforting", 0.8)
 # main("cozy comforting relaxing", 0.8)
 # main("steam deck compatible", 0.8)
 # main("final fantasy", 0.8)
+# main("chrono trigger", 0.75)
+# main("super metroid", 0.75)
+# main("aria of sorrow", 0.75) # test stopword removal
+# main("WARIOWARE TOUCHED!", 0.75) # test lowercase, punctuation removal

@@ -99,7 +99,7 @@ function App() {
             value={query}
             alignItems='center'/>
 
-            <Button variant="text" onClick={handleTransfer}> Transfer Data </Button>
+            <Button variant="text" onClick={handleTransfer}> Get Recommendations </Button>
         </Box>
 
         <Box
