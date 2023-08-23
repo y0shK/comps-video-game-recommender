@@ -74,11 +74,19 @@ def get_review_info(api_key, headers, offset):
 
 # games = get_game_info(api_key=GAMESPOT_API_KEY, headers=HEADERS)
 
-def main(query_string): 
+# wrap recommendation process into helper functions; then, if no recs found, lower cos similarity and try again
+
+"""
+perform_vectorization
+Arguments: query_string: str (user input that is provided in app.py)
+            cos_similarity_threshold: float (what value to assign for cos similarity of user vector/each review vector)
+Returns: game_title_ids: {} - key: game title, value: game id
+"""
+def perform_vectorization(query_string, cos_similarity_threshold):
 
     # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
     reviews = {}
-    for i in range(30):
+    for i in range(30): # TODO parameterize this amount
         new_reviews = get_review_info(api_key=GAMESPOT_API_KEY, headers=HEADERS, offset=i*99)
         reviews = {**reviews, **new_reviews}
 
@@ -113,7 +121,7 @@ def main(query_string):
     # if the cosine similarity is greater than a certain threshold, then recommend the game
     # record game titles of recommended games
     game_title_ids = {} # key: game title, value: game id
-    cos_threshold = 0.75
+    cos_threshold = cos_similarity_threshold
 
     print(len(reviews))
     print(len(gamesData))
@@ -133,15 +141,26 @@ def main(query_string):
             game_title_ids[k] = v['id']
 
     print("Recommended games: ")
-    print(game_title_ids.keys())
+    #print(game_title_ids.keys()) e.g., ['Pokemon Blue', 'Pokemon Silver']
+    #print(game_title_ids[list(game_title_ids.keys())[0]]) e.g., game_title_ids['Pokemon Blue'] = some_id
 
-    # TODO add error checks in case no games recommended
-    # get images from names of recommended games - DONE
+    return game_title_ids
+
+"""
+extract_recommendations_from_vectors
+Arguments: game_title_ids: {} - {game title: game id to cross-reference with review}
+Returns: image_recs: {} - {game_id: 'game_id', url: 'url'}
+"""
+def extract_recommendations_from_vectors(game_title_ids):
 
     image_recs = []
     for k, v in game_title_ids.items():
         rec_url = "http://www.gamespot.com/api/games/?api_key=" + GAMESPOT_API_KEY + "&format=json" + \
         "&filter=id:" + str(v)
+
+        print("rec_url")
+        print(rec_url)
+
         rec_call = session.get(rec_url, headers=HEADERS)
         rec_json = json.loads(rec_call.text)['results']
         # pdb.set_trace()
@@ -155,15 +174,45 @@ def main(query_string):
 
     # pdb.set_trace()
     print(image_recs)
+    return image_recs
 
+
+"""
+main()
+Arguments: query_string: str (user input raw string)
+            cos_similarity_threshold: float 
+            (recursively whittle down until 0. Divide by 2 each time. Use round() to ensure base case 0 reached.)
+            If 0 reached, truly no results)
+Returns: {game: 'gameName', url: 'urlPath'} to Flask API
+"""
+def main(query_string, cos_similarity_threshold): 
+
+    cos_similarity_threshold = round(cos_similarity_threshold, 2)
+
+    game_title_ids = perform_vectorization(query_string=query_string, cos_similarity_threshold=cos_similarity_threshold)
+    image_recs = extract_recommendations_from_vectors(game_title_ids=game_title_ids)
+    
     # https://stackoverflow.com/questions/1557571/how-do-i-get-time-of-a-python-programs-execution
     elapsed_time = time.time() - start_time
     print("Time (seconds): ", elapsed_time)
 
-    # account for no games found
-    if len(image_recs) == 0:
-        return {'game name':  'null'}
+    # recursive call of main()
+    if len(image_recs) > 0: # base case 1. we have a recommendation
+        print("cos similarity: ", cos_similarity_threshold)
+        return image_recs[0]
+    # base case 2. we have no possible recommendation. this is like Google saying "no results found"
+    if round(cos_similarity_threshold, 2) == 0.0: 
+        return {'game name': 'null', 'url': 'null'}
+    else: # recursive case. halve cosine similarity and try again.
+        return main(query_string=query_string, cos_similarity_threshold=round((cos_similarity_threshold / 2), 2))
 
-    return image_recs[0]
-
-# main("cute artistic")
+"""
+Test cases.
+(Actual call to main() is in app.py in flask backend)
+"""
+# main("masterpiece aesthetic gothic", 0.75)
+# main("challenging atmospheric", 0.8)
+# main("accessible cozy comforting", 0.8)
+# main("cozy comforting relaxing", 0.8)
+# main("steam deck compatible", 0.8)
+# main("final fantasy", 0.8)

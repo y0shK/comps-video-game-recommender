@@ -29,4 +29,4 @@ def query():
         data.update_query(query)
         return data.query_body
     elif request.method == "GET":
-        return main(data.query_body)
+        return main(data.query_body, 0.75)
