@@ -29,4 +29,5 @@ def query():
         data.update_query(query)
         return data.query_body
     elif request.method == "GET":
+        # Return output of the form {'game name': 'Game name', 'url': 'URL to game name'}
         return main(data.query_body, 0.75)
