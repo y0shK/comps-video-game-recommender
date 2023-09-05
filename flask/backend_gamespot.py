@@ -9,6 +9,9 @@ from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 
 from vaderSentiment import vaderSentiment
+import pandas as pd
+from sklearn.decomposition import TruncatedSVD
+
 from video_game import VideoGame, VideoGameCollection
 from tf_idf import get_fitted_train_matrix, get_unfitted_review_matrix
 from sklearn.metrics.pairwise import cosine_similarity
@@ -145,7 +148,7 @@ def get_query_sentiment(query_string):
 
 """
 perform_vectorization
-Perform vectorization of both statistical (TF-IDF) and semantic (sentiment analysis) approaches
+Perform vectorization of both statistical (TF-IDF) and semantic (sentiment analysis/LSA) approaches
 Arguments: query_string: str (user input that is provided in app.py)
             cos_similarity_threshold: float (what value to assign for cos similarity of user vector/each review vector)
 Returns: game_title_ids: {} - key: game title, value: {game id, cos similarity between user vector/review}
@@ -155,10 +158,15 @@ def perform_vectorization(query_string, cos_similarity_threshold):
     # create new video game collection to store video games used for reviews (TF-IDF)
     game_collection = VideoGameCollection()
 
+    # create list of all reviews to perform SVD on TF-IDF matrix
+    review_corpus = []
+
     reviews = get_reviews(review_count=30)
     for k, v in reviews.items():
         game = VideoGame(name=v['game_name'], id=v['game_id'], review=v['body'], score=v['score'])
         game_collection.add_to_collection(game=game)
+
+        review_corpus.append(v['body'])
 
     print(game_collection.get_data())
 
@@ -175,7 +183,7 @@ def perform_vectorization(query_string, cos_similarity_threshold):
 
     # structure query into appropriate data format for tf-idf methods
     user_query = [query_string] 
-    user_matrix = get_fitted_train_matrix(user_query) 
+    vectorizer, user_matrix = get_fitted_train_matrix(user_query) 
 
     # go through videoGameCollection's data {key: value} pairs
     # find how similar the query vector and review vector are by using cosine similarity
@@ -190,8 +198,36 @@ def perform_vectorization(query_string, cos_similarity_threshold):
     # pdb.set_trace()
 
     # sentiment analysis
+    # https://github.com/cjhutto/vaderSentiment
     query_sentiment = get_query_sentiment(query_string=query_string)
     analyzer = vaderSentiment.SentimentIntensityAnalyzer()
+
+    # set up latent semantic analysis
+    # https://machinelearninggeek.com/latent-semantic-indexing-using-scikit-learn/
+
+    review_vectorizer, review_train_data = get_fitted_train_matrix(review_corpus)
+
+    # define number of topics per review, and then factorize tf-idf matrix 
+    num_components = 10
+    lsa = TruncatedSVD(n_components=num_components, n_iter=100, random_state=42)
+    lsa.fit_transform(review_train_data)
+
+    sigma = lsa.singular_values_ 
+    v_transpose = lsa.components_.T
+
+    review_topics = review_vectorizer.get_feature_names_out()
+
+    print("review topics")
+    print(review_topics)
+
+    review_terms_list = []
+
+    for index, component in enumerate(lsa.components_):
+        zipped = zip(review_topics, component)
+        top_terms_key = sorted(zipped, key = lambda t: t[1], reverse=True)[:5]
+        top_terms_list = list(dict(top_terms_key).keys())
+        review_terms_list += top_terms_list
+        print("Topic " + str(index) + ": ", top_terms_list)
 
     for k, v in gamesData.items():
         
@@ -200,7 +236,7 @@ def perform_vectorization(query_string, cos_similarity_threshold):
         # similar to what Google does - recommends search query & other related games
         review_content = v['review'] + " " + k
         review_content = [review_content]
-        m = get_unfitted_review_matrix(user_query, review_content)
+        unfitted_vectorizer, m = get_unfitted_review_matrix(user_query, review_content)
 
         # check sentiment of review to see if "emotion" of game is similar
         vs = analyzer.polarity_scores(review_content)
@@ -221,6 +257,19 @@ def perform_vectorization(query_string, cos_similarity_threshold):
                                  'game_input_cos_similarity': round(float(cos_sim.item()), 2),
                                  'sentiment': review_sentiment} 
 
+        # use latent semantic analysis results
+        # if query is relevant to overall review LSA and this specific game review, 
+        # recommend this specific game
+        # bag of words assumption
+        query_split = query_string.split()
+        for term in query_split:
+            if term in review_terms_list and game not in game_title_ids and \
+                (term in k or term in v['review']): # term in name (key) or review content
+                game_title_ids[k] = {'game_id': v['id'], 
+                                 'game_input_cos_similarity': round(float(cos_sim.item()), 2),
+                                 'sentiment': review_sentiment} 
+
+
     print("Recommended games: ")
     #print(game_title_ids.keys()) e.g., ['Pokemon Blue', 'Pokemon Silver']
     #print(game_title_ids[list(game_title_ids.keys())[0]]) 
@@ -237,6 +286,11 @@ Returns: image_recs: list of dicts [{}, {}, ...]
 """
 def extract_recommendations_from_vectors(game_title_ids):
 
+    # in case no appropriate game recommendations are found,
+    # return empty list. In main(), recursive case will recall process with lower cosine similarity threshold
+    if len(game_title_ids) == 0:
+        return []
+
     image_recs = []
     for k, v in game_title_ids.items():
         rec_url = "http://www.gamespot.com/api/games/?api_key=" + GAMESPOT_API_KEY + "&format=json" + \
@@ -249,13 +303,16 @@ def extract_recommendations_from_vectors(game_title_ids):
         rec_json = json.loads(rec_call.text)['results']
         # pdb.set_trace()
 
-        rec = {}
-        rec['game'] = rec_json[0]['name']
-        rec['url'] = rec_json[0]['image']['original']
-        rec['cos_sim'] = v['game_input_cos_similarity'] 
-        rec['sentiment'] = v['sentiment']
-        image_recs.append(rec)
-        # {'Game name': 'https://www.gamespot.com/a/uploads/original/image.png'}
+        # only add recommendation to potential list if response object exists
+        # this check ensures all information can be found
+        if rec_json and rec_json[0]:
+            rec = {}
+            rec['game'] = rec_json[0]['name']
+            rec['url'] = rec_json[0]['image']['original']
+            rec['cos_sim'] = v['game_input_cos_similarity'] 
+            rec['sentiment'] = v['sentiment']
+            image_recs.append(rec)
+            # {'Game name': 'https://www.gamespot.com/a/uploads/original/image.png'}
 
     # pdb.set_trace()
     print(image_recs)
@@ -285,7 +342,9 @@ def main(query_string, cos_similarity_threshold):
     # https://stackoverflow.com/questions/5320871/how-to-find-the-min-max-value-of-a-common-key-in-a-list-of-dicts
 
     # recursive call of main()
-    if len(image_recs) > 0: # base case 1. we have a recommendation. return the most salient one
+    # base case. we have a recommendation. 
+    # return the most salient one, depending on statistical/semantic methods
+    if len(image_recs) > 0: 
         print("current cos similarity threshold: ", cos_similarity_threshold)
 
         max_cos_sim_rec = max(image_recs, key = lambda x : x['cos_sim'])
@@ -298,6 +357,7 @@ def main(query_string, cos_similarity_threshold):
             return max_sentiment_rec
         
         # if there are multiple recommendations with cosine similarity 1.0, use sentiment to break tie
+        # https://stackoverflow.com/questions/4587915/return-list-of-items-in-list-greater-than-some-value
         cos_sim_1 = [rec for rec in image_recs if rec['cos_sim'] == 1.0]
         if len(cos_sim_1) == 1:
             return cos_sim_1[0]
@@ -305,10 +365,7 @@ def main(query_string, cos_similarity_threshold):
             return max_sentiment_rec
 
         return max_cos_sim_rec
-    
-    # base case 2. we have no possible recommendation. this is like Google saying "no results found"
-    if round(cos_similarity_threshold, 2) == 0.0: 
-        return {'game name': 'null', 'url': 'null'}
+
     else: # recursive case. halve cosine similarity and try again.
         return main(query_string=query_string, cos_similarity_threshold=round((cos_similarity_threshold / 2), 2))
 
@@ -322,8 +379,11 @@ Test cases.
 # main("accessible cozy comforting", 0.8)
 # main("cozy comforting relaxing", 0.8)
 # main("steam deck compatible", 0.8)
-# main("final fantasy", 0.8)
+# main("final fantasy with customization and atmosphere", 0.75)
 # main("chrono trigger", 0.75)
 # main("super metroid", 0.75)
 # main("aria of sorrow", 0.75) # test stopword removal
 # main("WARIOWARE TOUCHED!", 0.75) # test lowercase, punctuation removal
+
+# main("vampire the masquerade dnd like game", 0.8)
+# main("customizable system-driven dungeon crawler", 0.75)

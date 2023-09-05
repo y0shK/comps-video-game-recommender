@@ -15,18 +15,28 @@ get_unfitted_review_matrix(["query plaintext"], ["review plaintext"])
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 # user query matrix
+"""
+get_fitted_train_matrix
+Arguments: list of strings to train tf-idf vectorizer
+Returns: list containing vectorizer and matrix (fitted and transformed)
+"""
 def get_fitted_train_matrix(corpus):
 
     # transform the query into a tf-idf vector
-    v = TfidfVectorizer()
+    v = TfidfVectorizer(ngram_range=(1,2), stop_words='english')
     tfidf_matrix = v.fit_transform(corpus) # fit_transform is fitting and transforming on corpus
-    return tfidf_matrix
+    return [v, tfidf_matrix]
 
 # review matrix per game
+"""
+get_unfitted_train_matrix
+Arguments: list of strings to train tf-idf vectorizer
+Returns: list containing vectorizer and matrix (only transformed)
+"""
 def get_unfitted_review_matrix(fit_corpus, transform_corpus):
     
     # transform the review into a tf-idf vector
-    v = TfidfVectorizer()
+    v = TfidfVectorizer(ngram_range=(1,2), stop_words='english')
     v.fit(fit_corpus) # fit on original corpus (user query)
     matrix = v.transform(transform_corpus) # transform on new corpus (review)
-    return matrix
+    return [v, matrix]
