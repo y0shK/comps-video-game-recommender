@@ -118,11 +118,11 @@ Get review dataset from GameSpot API
 Arguments: review_count (how many reviews to query from API)
 Returns: {'game1': 'review1', ...}
 """
-def get_reviews(review_count=30):
+def get_reviews(api_key, headers, review_count=30):
     # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
     reviews = {}
     for i in range(review_count):
-        new_reviews = get_review_info(api_key=GAMESPOT_API_KEY, headers=HEADERS, offset=i*99)
+        new_reviews = get_review_info(api_key=api_key, headers=headers, offset=i*99)
         reviews = {**reviews, **new_reviews}
     return reviews
 
@@ -154,7 +154,7 @@ def perform_vectorization(query_string, cos_similarity_threshold):
     # create list of all reviews to perform SVD on TF-IDF matrix
     review_corpus = []
 
-    reviews = get_reviews(review_count=30)
+    reviews = get_reviews(api_key=GAMESPOT_API_KEY, headers=HEADERS, review_count=30)
     for k, v in reviews.items():
         game = VideoGame(name=v['game_name'], id=v['game_id'], review=v['body'], score=v['score'])
         game_collection.add_to_collection(game=game)

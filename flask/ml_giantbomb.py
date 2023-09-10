@@ -20,7 +20,6 @@ from nltk.corpus import stopwords
 
 from tf_idf import get_fitted_train_matrix, get_unfitted_review_matrix
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.cluster import k_means
 
 start_time = time.time()
 load_dotenv()
@@ -80,3 +79,57 @@ pdb.set_trace()
 #k = 3
 #kmeans = k_means(n_clusters=k)
 #y_pred = kmeans.fit_predict(get_fitted_train_matrix(''))
+
+# TODO use game_review_clusters.py instead - this was a test to learn more about text clustering 
+
+from sklearn.cluster import KMeans
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+import pandas as pd
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+"""
+vect = TfidfVectorizer(ngram_range=(1,2), stop_words='english')
+# fit_transform is fitting and transforming on corpus
+
+X = []
+y = []
+for k, v in tf_idf_dict.items():
+    X.append(vect.fit_transform(v['deck'])) # game deck x axis
+    y.append(vect.fit_transform(v['name'])) # game deck y axis
+
+pdX = []
+for i in range(len(X)):
+    curr = pd.DataFrame(X[i].toarray())
+    pdX.append(curr)
+
+pdb.set_trace()
+
+kmeans = KMeans(n_clusters=2, random_state=0, n_init="auto").fit(pdX)
+y_pred = kmeans.fit_predict(pdX)
+clusters = kmeans.cluster_centers_
+
+pdb.set_trace()
+
+df = pd.DataFrame(
+     y_pred)
+
+plt.style.use("fivethirtyeight")
+plt.figure(figsize=(8, 8))
+
+scat = sns.scatterplot(
+"component_1",
+"component_2",
+s=50,
+data=df,
+hue="predicted_cluster",
+style="true_label",
+palette="Set2",
+)
+
+scat.set_title("Clustering results from TCGA Pan-Cancer\nGene Expression Data")
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.0)
+plt.show()
+"""
