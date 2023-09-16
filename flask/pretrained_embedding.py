@@ -31,7 +31,10 @@ HEADERS = {'User-Agent': 'Video Game Recommender Comprehensive Project'}
 GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 
 # input game X
-QUERY = "klonoa door to phantomile"
+# QUERY = "klonoa door to phantomile"
+QUERY = "super mario rpg"
+# QUERY = "vampire the masquerade"
+# QUERY = "sid meier civilization iv"
 
 # https://www.giantbomb.com/api/documentation/#toc-0-17
 game_url = "https://www.giantbomb.com/api/search/?api_key=" + GIANTBOMB_API_KEY + \
@@ -43,9 +46,27 @@ game_resp = session.get(game_url, headers=HEADERS)
 # pdb.set_trace()
 
 game_json = json.loads(game_resp.text)
-game_results = game_json['results'][0]
+game_results = None
 
-# FIXME figure out how to deal with "deck/desc not found" for query
+pdb.set_trace()
+
+# ensure that deck and description exist for cosine similarity step
+# check number of page results and grab the first entry that has necessary info (non-null values)
+
+num_results = game_json['number_of_page_results']
+game_not_found = True
+
+for i in range(min(num_results, 10)):
+    if game_json['results'][i]['deck'] != None and game_json['results'][i]['description'] != None \
+    and game_not_found:
+        game_results = game_json['results'][i]
+        game_not_found = False
+
+
+if game_results == None:
+    print("Input query game not found in API database")
+    exit()
+
 # FIXME make sure the code fits the diagram
 
 game_name = game_results['name']
@@ -150,7 +171,12 @@ for k, v in games_dict.items():
     #pdb.set_trace()
     
     # check the cosine similarity between the tokenized descriptions to get related games
-    if len(query_desc_data) > 0 and len(desc) > 0:
+
+    if len(query_desc_data) >= 5 and len(deck) >= 5:
+        model_similarity = model_similarity = model.n_similarity(query_deck_data[0:5], deck[0:5])
+        sims[k] = model_similarity
+
+    if len(query_desc_data) >= 5 and len(desc) >= 5:
         model_similarity = model.n_similarity(query_desc_data[0:5], desc[0:5])
         sims[k] = model_similarity
     #pdb.set_trace()
@@ -159,6 +185,9 @@ for k, v in games_dict.items():
 
 print(sims)
 max_similiarity = max(sims.values())
+
+print("look for similar games manually")
+pdb.set_trace()
 
 for k, v in sims.items():
     if v == max_similiarity:
