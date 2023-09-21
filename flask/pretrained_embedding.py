@@ -32,34 +32,37 @@ GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 
 # input game X
 # QUERY = "klonoa door to phantomile"
-QUERY = "super mario rpg"
-# QUERY = "vampire the masquerade"
-# QUERY = "sid meier civilization iv"
+# QUERY = "super mario rpg"
+# QUERY = "vampire the masquerade" - "Alone in the Dark"
+# QUERY = "sid meier civilization iv" - gives reasonable answers (i.e., Sid Meier / Civ games)
+#QUERY = "final fantasy" # - # gives reasonable answers (i.e., final fantasy series games)
+# QUERY = "baldur's gate"
+QUERY = "super mario bros"
 
 # https://www.giantbomb.com/api/documentation/#toc-0-17
-game_url = "https://www.giantbomb.com/api/search/?api_key=" + GIANTBOMB_API_KEY + \
+search_api_url = "https://www.giantbomb.com/api/search/?api_key=" + GIANTBOMB_API_KEY + \
     "&format=json&query=" + QUERY + \
     "&resources=game" + \
     "&resource_type=game" 
     # resources = game details that should inform the results, while resource_type = game recommendation itself
-game_resp = session.get(game_url, headers=HEADERS)
+search_game_resp = session.get(search_api_url, headers=HEADERS)
 # pdb.set_trace()
 
-game_json = json.loads(game_resp.text)
+search_json = json.loads(search_game_resp.text)
 game_results = None
 
-pdb.set_trace()
+# pdb.set_trace()
 
 # ensure that deck and description exist for cosine similarity step
 # check number of page results and grab the first entry that has necessary info (non-null values)
 
-num_results = game_json['number_of_page_results']
+num_results = search_json['number_of_page_results']
 game_not_found = True
 
 for i in range(min(num_results, 10)):
-    if game_json['results'][i]['deck'] != None and game_json['results'][i]['description'] != None \
+    if search_json['results'][i]['deck'] != None and search_json['results'][i]['description'] != None \
     and game_not_found:
-        game_results = game_json['results'][i]
+        game_results = search_json['results'][i]
         game_not_found = False
 
 
@@ -69,9 +72,17 @@ if game_results == None:
 
 # FIXME make sure the code fits the diagram
 
-game_name = game_results['name']
+query_name = game_results['name']
 game_deck = game_results['deck']
 game_desc = game_results['description']
+
+game_platforms = game_results['platforms']
+
+pdb.set_trace()
+
+GUID = game_results['guid']
+
+pdb.set_trace()
 
 tokenizer = RegexpTokenizer(r'\w+')
 stops = set(stopwords.words("english"))
@@ -80,12 +91,63 @@ query_deck_data = list(set(tokenizer.tokenize(game_deck.lower())) - stops)
 query_desc_data = list(set(tokenizer.tokenize(game_desc.lower())) - stops)
 query_desc_data = [desc for desc in query_desc_data if desc.isalpha()]
 
+platform_list = []
+for plat in game_platforms:
+    for k, v in plat.items():
+        if k == 'name':
+            platform_list.append(v)
+
+# pdb.set_trace()
+
+# get aspects of GUID - genres, themes, franchises
+
+game_api_url = "https://www.giantbomb.com/api/game/" + \
+GUID + "/?api_key=" + GIANTBOMB_API_KEY + \
+    "&format=json"
+game_api_resp = session.get(game_api_url, headers=HEADERS)
+
+game_api_json = json.loads(game_api_resp.text)
+game_api_results = game_api_json['results']
+
+# ground truth for similar_games
+similar_games_to_query = game_api_json['results']['similar_games']
+# pdb.set_trace()
+
+similar_game_names = []
+for i in range(len(similar_games_to_query)):
+    similar_game_names.append(similar_games_to_query[i]['name'])
+
+pdb.set_trace()
+
+game_genres = game_api_json['results']['genres']
+genre_list = []
+for i in range(len(game_genres)):
+    genre_list.append(game_genres[i]['name'])
+
+game_themes = game_api_json['results']['themes']
+theme_list = []
+for i in range(len(game_themes)):
+    theme_list.append(game_themes[i]['name'])
+
+game_franchises = game_api_json['results']['franchises']
+franchise_list = []
+for i in range(len(game_franchises)):
+    franchise_list.append(game_franchises[i]['name'])
+
+pdb.set_trace()
+
 #pdb.set_trace()
 
 query_dict = {}
-query_dict[game_name] = {'name': game_name,
+query_dict[query_name] = {'name': query_name,
                          'deck': query_deck_data,
-                         'description': query_desc_data}
+                         'description': query_desc_data,
+                         'platforms': game_platforms,
+                         'genres': genre_list,
+                         'franchises': franchise_list,
+                         'themes': theme_list}
+
+pdb.set_trace()
 
 #pdb.set_trace()
 
@@ -130,7 +192,8 @@ def get_games(api_key, headers, game_count=10):
         
     return games
 
-games_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=3)
+games_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=20)
+games_test_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=10)
 #pdb.set_trace()
 
 """
@@ -163,22 +226,90 @@ model = gensim.downloader.load('glove-wiki-gigaword-50')
 
 sims = {}
 for k, v in games_dict.items():
+
+    # check name
+    if query_name == v['name'] or query_name in v['name']:
+        model_similarity = model.n_similarity(query_name, v['name'])
+        if model_similarity >= 0.8:
+            sims[k] = model_similarity
+
     deck = list(set(tokenizer.tokenize(v['deck'])) - stops)
     desc = list(set(tokenizer.tokenize(v['description'])) - stops) 
     deck = [d.lower() for d in deck]
     desc = [d.lower() for d in desc if d.isalpha()]
 
+    this_genre = []
+    this_theme = []
+    this_franchise = []
+
+    genres = v['genres']
+
+    for genre in genres:
+        for k1, v1 in genre.items():
+            this_genre.append(v1)
+
+    themes = v['themes']
+
+    for theme in themes:
+        for k1, v1 in theme.items():
+            this_theme.append(v1)
+
+    franchises = v['franchises']
+
+    for franchise in franchises:
+        for k1, v1 in franchise.items():
+            this_franchise.append(v1)
+
+    # pdb.set_trace()
+
     #pdb.set_trace()
     
     # check the cosine similarity between the tokenized descriptions to get related games
 
-    if len(query_desc_data) >= 5 and len(deck) >= 5:
-        model_similarity = model_similarity = model.n_similarity(query_deck_data[0:5], deck[0:5])
-        sims[k] = model_similarity
+    min_deck_tokens = min(len(query_deck_data), len(deck))
+    min_desc_tokens = min(len(query_desc_data), len(desc))
 
-    if len(query_desc_data) >= 5 and len(desc) >= 5:
-        model_similarity = model.n_similarity(query_desc_data[0:5], desc[0:5])
-        sims[k] = model_similarity
+    min_deck_tokens = max(min_deck_tokens, 5)
+    min_desc_tokens = max(min_desc_tokens, 5)
+
+   #  pdb.set_trace()
+
+    if len(query_desc_data) >= min_deck_tokens and len(deck) >= min_deck_tokens:
+        model_similarity = model.n_similarity(query_deck_data[0:min_deck_tokens], deck[0:min_deck_tokens])
+
+        if model_similarity >= 0.8:
+            sims[k] = model_similarity
+
+    if len(query_desc_data) >= min_desc_tokens and len(desc) >= min_desc_tokens:
+        model_similarity = model.n_similarity(query_desc_data[0:min_desc_tokens], desc[0:min_desc_tokens])
+        
+        if model_similarity >= 0.8:
+            sims[k] = model_similarity
+
+    # use genres, themes, and franchises
+    if len(genre_list) > 0 and len(this_genre) > 0:
+
+        for g in this_genre:
+            if g in genre_list:
+                model_similarity = model.n_similarity(genre_list[0], g)
+                if model_similarity >= 0.8:
+                    sims[k] = model_similarity
+                
+
+    if len(theme_list) > 0 and len(this_theme) > 0:
+        for g in this_theme:
+            if g in theme_list:
+                model_similarity = model.n_similarity(theme_list[0], g)
+                if model_similarity >= 0.8:
+                    sims[k] = model_similarity
+
+    if len(franchise_list) > 0 and len(this_franchise) > 0:
+        for g in this_franchise:
+            if g in franchise_list:
+                model_similarity = model.n_similarity(franchise_list[0], g)
+                if model_similarity >= 0.8:
+                    sims[k] = model_similarity
+
     #pdb.set_trace()
 
     # pdb.set_trace()
@@ -189,35 +320,34 @@ max_similiarity = max(sims.values())
 print("look for similar games manually")
 pdb.set_trace()
 
+topX = 5
+count = 0
 for k, v in sims.items():
-    if v == max_similiarity:
+    if v == max_similiarity and count < topX:
         print(k, v)
+        count += 1
 
-"""
-sentence_obama = 'Obama speaks to the media in Illinois'.lower().split()
+# calculate precision and recall
+# precision - correctly recommended items / total recommended items
+# recall - correctly recommended items / total useful recommended items
+# Let "useful" recommended items be any item that has the same genre, theme, or franchise
 
-sentence_president = 'The president greets the press in Chicago'.lower().split()
->>>
+# PR definition
+# https://www.sciencedirect.com/science/article/pii/S1110866515000341#b0435
 
-similarity = word_vectors.wmdistance(sentence_obama, sentence_president)
+ground_truth_recs = [i for i in similar_game_names if i in games_dict.keys()]
+recommender_results = [i for i in similar_game_names if i in sims]  
+total_recs = [i for i in sims.keys()]
 
-print(f"{similarity:.4f}")
-3.4893
->>>
+# precision = correct recs in ground truth
+# recall = correct recs / total recs
+precision = min(len(recommender_results) / len(ground_truth_recs), 1)
+recall = min(len(recommender_results) / len(total_recs), 1)
 
-distance = word_vectors.distance("media", "media")
+print("precision, recall")
+print(precision)
+print(recall)
 
-print(f"{distance:.1f}")
-0.0
->>>
+# TODO try ROC curve to see what happens as precision/recall tradeoff is made
 
-similarity = word_vectors.n_similarity(['sushi', 'shop'], ['japanese', 'restaurant'])
-
-print(f"{similarity:.4f}")
-0.7067
-
-"""
-
-#import gensim.downloader
-#model = gensim.downloader.load('glove-wiki-gigaword-50')
-#pdb.set_trace()
+pdb.set_trace()
