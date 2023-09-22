@@ -21,6 +21,8 @@ from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 start_time = time.time()
 load_dotenv()
 session = requests_cache.CachedSession("pretrained_embeddings_cache")
@@ -350,4 +352,178 @@ print(recall)
 
 # TODO try ROC curve to see what happens as precision/recall tradeoff is made
 
-pdb.set_trace()
+recs = list(sims.keys())
+
+tp_items = [i for i in recs if i in ground_truth_recs]
+fp_items = [i for i in recs if i not in ground_truth_recs]
+fn_items = [i for i in list(games_dict.keys()) if i not in recs and i in ground_truth_recs]
+tn_items = [i for i in list(games_dict.keys()) if i not in recs and i not in ground_truth_recs]
+        
+fpr = len(fp_items) / (len(fp_items) + len(tn_items))
+tpr = len(tp_items) / (len(tp_items) + len(fn_items))
+
+# pdb.set_trace()
+
+fpr_vals = [fpr]
+tpr_vals = [tpr]
+
+plt.plot(fpr, tpr)
+plt.show()
+
+for i in range(1, 4):
+    games_test_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=20 + 10 * i)
+
+    sims = {}
+    for k, v in games_test_dict.items():
+
+    # check name
+        if query_name == v['name'] or query_name in v['name']:
+            model_similarity = model.n_similarity(query_name, v['name'])
+            if model_similarity >= 0.8:
+                sims[k] = model_similarity
+
+        deck = list(set(tokenizer.tokenize(v['deck'])) - stops)
+        desc = list(set(tokenizer.tokenize(v['description'])) - stops) 
+        deck = [d.lower() for d in deck]
+        desc = [d.lower() for d in desc if d.isalpha()]
+
+        this_genre = []
+        this_theme = []
+        this_franchise = []
+
+        genres = v['genres']
+
+        for genre in genres:
+            for k1, v1 in genre.items():
+                this_genre.append(v1)
+
+        themes = v['themes']
+
+        for theme in themes:
+            for k1, v1 in theme.items():
+                this_theme.append(v1)
+
+        franchises = v['franchises']
+
+        for franchise in franchises:
+            for k1, v1 in franchise.items():
+                this_franchise.append(v1)
+
+        # pdb.set_trace()
+
+        #pdb.set_trace()
+        
+        # check the cosine similarity between the tokenized descriptions to get related games
+
+        min_deck_tokens = min(len(query_deck_data), len(deck))
+        min_desc_tokens = min(len(query_desc_data), len(desc))
+
+        min_deck_tokens = max(min_deck_tokens, 5)
+        min_desc_tokens = max(min_desc_tokens, 5)
+
+    #  pdb.set_trace()
+
+        if len(query_desc_data) >= min_deck_tokens and len(deck) >= min_deck_tokens:
+            model_similarity = model.n_similarity(query_deck_data[0:min_deck_tokens], deck[0:min_deck_tokens])
+
+            if model_similarity >= 0.8:
+                sims[k] = model_similarity
+
+        if len(query_desc_data) >= min_desc_tokens and len(desc) >= min_desc_tokens:
+            model_similarity = model.n_similarity(query_desc_data[0:min_desc_tokens], desc[0:min_desc_tokens])
+            
+            if model_similarity >= 0.8:
+                sims[k] = model_similarity
+
+        # use genres, themes, and franchises
+        if len(genre_list) > 0 and len(this_genre) > 0:
+
+            for g in this_genre:
+                if g in genre_list:
+                    model_similarity = model.n_similarity(genre_list[0], g)
+                    if model_similarity >= 0.8:
+                        sims[k] = model_similarity
+                    
+
+        if len(theme_list) > 0 and len(this_theme) > 0:
+            for g in this_theme:
+                if g in theme_list:
+                    model_similarity = model.n_similarity(theme_list[0], g)
+                    if model_similarity >= 0.8:
+                        sims[k] = model_similarity
+
+        if len(franchise_list) > 0 and len(this_franchise) > 0:
+            for g in this_franchise:
+                if g in franchise_list:
+                    model_similarity = model.n_similarity(franchise_list[0], g)
+                    if model_similarity >= 0.8:
+                        sims[k] = model_similarity
+
+        #pdb.set_trace()
+
+        # pdb.set_trace()
+
+    print(sims)
+    max_similiarity = max(sims.values())
+
+    print("look for similar games manually")
+    # pdb.set_trace()
+
+    topX = 5
+    count = 0
+    for k, v in sims.items():
+        if v == max_similiarity and count < topX:
+            print(k, v)
+            count += 1
+
+    # calculate precision and recall
+    # precision - correctly recommended items / total recommended items
+    # recall - correctly recommended items / total useful recommended items
+    # Let "useful" recommended items be any item that has the same genre, theme, or franchise
+
+    # PR definition
+    # https://www.sciencedirect.com/science/article/pii/S1110866515000341#b0435
+
+    ground_truth_recs = [i for i in similar_game_names if i in games_dict.keys()]
+    recommender_results = [i for i in similar_game_names if i in sims]  
+    total_recs = [i for i in sims.keys()]
+
+    # precision = correct recs in ground truth
+    # recall = correct recs / total recs
+    precision = min(len(recommender_results) / len(ground_truth_recs), 1)
+    recall = min(len(recommender_results) / len(total_recs), 1)
+
+    print("precision, recall")
+    print(precision)
+    print(recall)
+
+    # TODO try ROC curve to see what happens as precision/recall tradeoff is made
+
+    recs = list(sims.keys())
+
+    tp_items = [i for i in recs if i in ground_truth_recs]
+    fp_items = [i for i in recs if i not in ground_truth_recs]
+    fn_items = [i for i in list(games_dict.keys()) if i not in recs and i in ground_truth_recs]
+    tn_items = [i for i in list(games_dict.keys()) if i not in recs and i not in ground_truth_recs]
+            
+    # https://stackoverflow.com/questions/41757653/how-to-compute-aucarea-under-curve-for-recommendation-system-evaluation
+    fpr = len(fp_items) / (len(fp_items) + len(tn_items))
+    tpr = len(tp_items) / (len(tp_items) + len(fn_items))
+
+    pdb.set_trace()
+
+    fpr_vals.append(fpr)
+    tpr_vals.append(tpr)
+
+# before, didn't have evaluation metrics.
+# now, use supervised learning to say that similar_games are ground_truth and use PR based on that
+# currently have PR and ROC curve
+# TODO
+# 1. optimize for the metric. reduce FPR (false positive rate) and keep TPR high
+# 2. reduce total recommendations so that entire universe isn't recommended
+# 3. continue algorithm to improve performance
+# other metrics not necessarily needed
+
+plt.plot(fpr_vals, tpr_vals)
+plt.show()
+# pdb.set_trace()
