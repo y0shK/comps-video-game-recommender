@@ -80,11 +80,11 @@ game_desc = game_results['description']
 
 game_platforms = game_results['platforms']
 
-pdb.set_trace()
+#pdb.set_trace()
 
 GUID = game_results['guid']
 
-pdb.set_trace()
+#pdb.set_trace()
 
 tokenizer = RegexpTokenizer(r'\w+')
 stops = set(stopwords.words("english"))
@@ -113,11 +113,15 @@ game_api_results = game_api_json['results']
 
 # ground truth for similar_games
 similar_games_to_query = game_api_json['results']['similar_games']
-# pdb.set_trace()
+print("similar_games_to_query")
+pdb.set_trace()
 
 similar_game_names = []
-for i in range(len(similar_games_to_query)):
-    similar_game_names.append(similar_games_to_query[i]['name'])
+for i in range(min(len(similar_games_to_query), 2)):
+    name = similar_games_to_query[i]['name']
+    guid_val = similar_games_to_query[i]['api_detail_url'][35:-1] # check pdb for confirmation
+    similar_game_names.append({name: guid_val})
+    #pdb.set_trace()
 
 # TODO do this
 # use api_detail_url in similar_games[i] to call game API on each similar game
@@ -131,7 +135,87 @@ pdb.set_trace()
 # FIXME proof of concept - get 3, or as many as there are, whichever is less
 # get all info about these games and add them to games_dict to ensure presence of ground truth
 
+# do proof of concept
 
+if len(similar_game_names) == 0:
+    print("no similar games found")
+    exit()
+
+sample_game_len = min(2, len(similar_game_names))
+sample_similar_games = similar_game_names[0:sample_game_len]
+
+
+def get_game_demographics(json_file, dict_key):
+    call = json_file['results'][dict_key]
+    call_list = []
+    for i in range(len(call)):
+        call_list.append(call[i]['name'])
+
+    return call_list
+
+ground_truth_dict = {} # initialize here so that ground truth games are guaranteed
+
+print("check sg & sample_similar_games")
+#pdb.set_trace()
+
+for sg in sample_similar_games:
+    for k, v in sg.items(): # key = name and value = GUID
+        # https://www.giantbomb.com/api/documentation/#toc-0-17
+        search_sample_url = "https://www.giantbomb.com/api/game/" + \
+            v + "/?api_key=" + GIANTBOMB_API_KEY + \
+            "&format=json"
+        sample_resp = session.get(search_sample_url, headers=HEADERS)
+        pdb.set_trace()
+
+        # search_json = json.loads(search_game_resp.text)
+        sample_json = json.loads(sample_resp.text)
+        sample_results = sample_json['results']
+
+        print("sample_results")
+        pdb.set_trace()
+
+        for i in range(min(len(sample_results), 1)):
+            name = sample_results['name']
+            deck = sample_results['deck']
+            desc = sample_results['description']
+            platforms = sample_results['platforms']
+
+
+            deck_data = list(set(tokenizer.tokenize(deck.lower())) - stops)
+            desc_data = list(set(tokenizer.tokenize(desc.lower())) - stops)
+            desc_data = [desc for desc in desc_data if desc.isalpha()]
+
+            deck_str = ''
+            for d in deck_data:
+                entry = d + " "
+                deck_str += entry
+            
+            desc_str = ''
+            for d in desc_data:
+                entry = d + " "
+                desc_str += entry
+
+            print("check string deck and description")
+            pdb.set_trace()
+
+            genre_list = get_game_demographics(sample_json, 'genres')
+            theme_list = get_game_demographics(sample_json, 'themes')
+            franchise_list = get_game_demographics(sample_json, 'franchises')
+
+            ground_truth_dict[name] = {'name': name,
+                         'deck': deck,
+                         'description': desc,
+                         'platforms': platforms,
+                         'genres': genre_list,
+                         'franchises': franchise_list,
+                         'themes': theme_list}
+
+            print("check ground truth query_dict")
+            pdb.set_trace()
+
+
+print("check ground truth games")
+pdb.set_trace()
 
 def get_game_demographics(json_file, dict_key):
     call = json_file['results'][dict_key]
@@ -158,6 +242,7 @@ query_dict[query_name] = {'name': query_name,
                          'franchises': franchise_list,
                          'themes': theme_list}
 
+print("check ground truth games & dataset games")
 pdb.set_trace()
 
 #pdb.set_trace()
@@ -232,6 +317,16 @@ iterations = 4
 fpr_list = []
 tpr_list = []
 
+# put ground truth games into the dataset game set
+# now we can see how many of ground truth are plucked by the recommender
+games_dict = {** games_dict, ** ground_truth_dict}
+
+print("fix games_dict")
+pdb.set_trace()
+
+# FIXME TypeError: expected string or bytes-like object, got 'list'
+# probably need to get ground truth dict synchronized into games_dict properly
+
 for i in range(iterations): 
 
     # games_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=30, loop_offset=0 + 2 * i)
@@ -243,7 +338,7 @@ for i in range(iterations):
     # go through each game in list and see which is best
 
     for k, v in games_dict.items():
-
+        
         deck_data = list( \
         list(set(tokenizer.tokenize(v['deck'].lower()))-stops) \
         for v in games_dict.values() if tokenizer.tokenize(v['deck']) != [])
@@ -267,23 +362,29 @@ for i in range(iterations):
         this_theme = []
         this_franchise = []
 
-        genres = v['genres']
+        if k in ground_truth_dict:
+            this_genre = ground_truth_dict[k]['genres']
+            this_franchise = ground_truth_dict[k]['franchises']
+            this_theme = ground_truth_dict[k]['themes']
+        else:
 
-        for genre in genres:
-            for k1, v1 in genre.items():
-                this_genre.append(v1)
+            genres = v['genres']
 
-        themes = v['themes']
+            for genre in genres:
+                for k1, v1 in genre.items():
+                    this_genre.append(v1)
 
-        for theme in themes:
-            for k1, v1 in theme.items():
-                this_theme.append(v1)
+            themes = v['themes']
 
-        franchises = v['franchises']
+            for theme in themes:
+                for k1, v1 in theme.items():
+                    this_theme.append(v1)
 
-        for franchise in franchises:
-            for k1, v1 in franchise.items():
-                this_franchise.append(v1)
+            franchises = v['franchises']
+
+            for franchise in franchises:
+                for k1, v1 in franchise.items():
+                    this_franchise.append(v1)
 
         # pdb.set_trace()
 
@@ -294,8 +395,8 @@ for i in range(iterations):
         min_deck_tokens = min(len(query_deck_data), len(deck))
         min_desc_tokens = min(len(query_desc_data), len(desc))
 
-        min_deck_tokens = max(min_deck_tokens, 5)
-        min_desc_tokens = max(min_desc_tokens, 5)
+        min_deck_tokens = max(min_deck_tokens, 10)
+        min_desc_tokens = max(min_desc_tokens, 10)
 
         #  pdb.set_trace()
 
@@ -360,6 +461,9 @@ for i in range(iterations):
     games_dict = games[0]
     offset = games[1]
 
+    print("check games_dict.keys()")
+    pdb.set_trace()
+
 
     # calculate precision and recall
     # precision - correctly recommended items / total recommended items
@@ -369,9 +473,40 @@ for i in range(iterations):
     # PR definition
     # https://www.sciencedirect.com/science/article/pii/S1110866515000341#b0435
 
-    ground_truth_recs = [i for i in similar_game_names if i in games_dict.keys()]
-    recommender_results = [i for i in similar_game_names if i in sims]  
+    # FIXME find recs not appearing in here
+
+    # total_dict = {** games_dict, ** ground_truth_dict}
+    # FIXME i have a list of dicts which is not working with list comprehension.
+    # So, maybe use list of lists, or consider other data structure
+    # Either way, try to get ground_truth_recs not empty
+
+    #ground_truth_recs = 
+
+    #for i in similar_game_names:
+     #   for k, v in i.items():
+      #      if k in list(total_dict.keys()):
+       #         ground_truth_recs.append(k)
+
+    ground_truth_recs = []
+    ground_truth_recs.append(list(ground_truth_dict.keys())) # [['game1', 'game2']]
+    ground_truth_recs = ground_truth_recs[0] # ['game1', 'game2']
+
+    # ground_truth_recs = [i for i in similar_game_names if i in list(total_dict.keys())]
+
+    print("check ground truth recs var")
+    pdb.set_trace()
+
+    # recommender_results gets all ground truth games that were recommended from the dataset
+    # total_recs gets all recommended from dataset
+    recommender_results = [i for i in ground_truth_recs if i in sims.keys()]  
     total_recs = [i for i in sims.keys()]
+
+    print("check recommender_results and total_recs")
+    pdb.set_trace()
+
+    if len(ground_truth_recs) == 0:
+        print("ground truth recs len == 0")
+        exit()
 
     # precision = correct recs in ground truth
     # recall = correct recs / total recs
@@ -379,18 +514,24 @@ for i in range(iterations):
     recall = min(len(recommender_results) / len(total_recs), 1)
 
     print("precision, recall")
-    print(precision)
-    print(recall)
+    #print(precision)
+    #print(recall)
 
     # TODO try ROC curve to see what happens as precision/recall tradeoff is made
 
     recs = list(sims.keys())
+
+    print("check division by 0 error")
+    pdb.set_trace()
 
     tp_items = [i for i in recs if i in ground_truth_recs]
     fp_items = [i for i in recs if i not in ground_truth_recs]
     fn_items = [i for i in list(games_dict.keys()) if i not in recs and i in ground_truth_recs]
     tn_items = [i for i in list(games_dict.keys()) if i not in recs and i not in ground_truth_recs]
         
+    print("check items confusion matrix")
+    pdb.set_trace()
+
     fpr = len(fp_items) / (len(fp_items) + len(tn_items))
     tpr = len(tp_items) / (len(tp_items) + len(fn_items))
 
@@ -404,5 +545,5 @@ for i in range(iterations):
 plt.plot(fpr_list, tpr_list)
 plt.show()
 
-end_time = time.time() - time
+end_time = start_time - time
 print("seconds: ", end_time)
