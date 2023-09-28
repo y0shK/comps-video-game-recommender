@@ -23,6 +23,9 @@ from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 import numpy as np
 
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+import sklearn.metrics as metrics
+
 import matplotlib.pyplot as plt
 
 start_time = time.time()
@@ -117,13 +120,15 @@ print("similar_games_to_query")
 pdb.set_trace()
 
 similar_game_names = []
-for i in range(min(len(similar_games_to_query), 2)):
+similar_threshold = min(len(similar_games_to_query), 10)
+
+for i in range(min(len(similar_games_to_query), similar_threshold)):
+# for i in range(len(similar_games_to_query)):
     name = similar_games_to_query[i]['name']
     guid_val = similar_games_to_query[i]['api_detail_url'][35:-1] # check pdb for confirmation
     similar_game_names.append({name: guid_val})
     #pdb.set_trace()
 
-# TODO do this
 # use api_detail_url in similar_games[i] to call game API on each similar game
 # then, store genres, franchises etc
 # append dict to games_dict
@@ -132,7 +137,7 @@ print("similar games set trace")
 pdb.set_trace()
 
 # get ground truth games to avoid division by zero error
-# FIXME proof of concept - get 3, or as many as there are, whichever is less
+# proof of concept - get 3, or as many as there are, whichever is less
 # get all info about these games and add them to games_dict to ensure presence of ground truth
 
 # do proof of concept
@@ -141,11 +146,28 @@ if len(similar_game_names) == 0:
     print("no similar games found")
     exit()
 
-sample_game_len = min(2, len(similar_game_names))
-sample_similar_games = similar_game_names[0:sample_game_len]
+# TODO works with minimum of 2 and not minimum of 5. investigate why
 
+sample_game_len = min(len(similar_game_names), similar_threshold)
+# sample_game_len = len(similar_game_names)
+
+print(sample_game_len)
+pdb.set_trace()
+
+sample_similar_games = similar_game_names[0:sample_game_len]
+pdb.set_trace()
 
 def get_game_demographics(json_file, dict_key):
+
+    # check to make sure genre, theme, franchise, etc. is in the game results json
+    results_json = json_file['results']
+    if dict_key not in results_json.keys():
+        return ['']
+    elif json_file['results'][dict_key] == None:
+        return ['']
+    
+    # else, the appropriate call can be made from the API
+    
     call = json_file['results'][dict_key]
     call_list = []
     for i in range(len(call)):
@@ -165,13 +187,13 @@ for sg in sample_similar_games:
             v + "/?api_key=" + GIANTBOMB_API_KEY + \
             "&format=json"
         sample_resp = session.get(search_sample_url, headers=HEADERS)
-        pdb.set_trace()
+        # pdb.set_trace()
 
         # search_json = json.loads(search_game_resp.text)
         sample_json = json.loads(sample_resp.text)
         sample_results = sample_json['results']
 
-        print("sample_results")
+        print("sample_results for: " + str(k))
         pdb.set_trace()
 
         for i in range(min(len(sample_results), 1)):
@@ -210,20 +232,12 @@ for sg in sample_similar_games:
                          'franchises': franchise_list,
                          'themes': theme_list}
 
-            print("check ground truth query_dict")
-            pdb.set_trace()
+            # print("check ground truth query_dict")
+            # pdb.set_trace()
 
 
 print("check ground truth games")
 pdb.set_trace()
-
-def get_game_demographics(json_file, dict_key):
-    call = json_file['results'][dict_key]
-    call_list = []
-    for i in range(len(call)):
-        call_list.append(call[i]['name'])
-
-    return call_list
 
 genre_list = get_game_demographics(game_api_json, 'genres')
 theme_list = get_game_demographics(game_api_json, 'themes')
@@ -260,8 +274,6 @@ Returns: game_data (dict): key=name and value=
     id, name, deck, description, genres, themes, franchises, release date, image
 """
 def get_game_info(api_key, headers, offset):
-
-    # FIXME make get_game_info come from giantbomb so ground truth recs will be present, or just get more
     game_url = "http://www.gamespot.com/api/games/?api_key=" + api_key + "&format=json" + \
     "&offset=" + str(offset)
     game_call = session.get(game_url, headers=headers) 
@@ -291,7 +303,7 @@ def get_games(api_key, headers, game_count=10, loop_offset=0):
         
     return [games, new_offset]
 
-games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=5, loop_offset=0)
+games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=3, loop_offset=0)
 games_dict = games[0]
 offset = games[1]
 
@@ -312,8 +324,12 @@ import gensim.downloader
 model = gensim.downloader.load('glove-wiki-gigaword-50')
 #pdb.set_trace()
 
+
+# just use one iteration
+# then use sklearn metrics to do the AUC instead of manually doing iterations
+# this hopefully means that y_true is guaranteed to have ground_truth entries, hence not all 0s in y_true
+# so, tpr is a meaningful quantity?
 sims = {}
-iterations = 4
 fpr_list = []
 tpr_list = []
 
@@ -324,10 +340,7 @@ games_dict = {** games_dict, ** ground_truth_dict}
 print("fix games_dict")
 pdb.set_trace()
 
-# FIXME TypeError: expected string or bytes-like object, got 'list'
-# probably need to get ground truth dict synchronized into games_dict properly
-
-for i in range(iterations): 
+model_sim_threshold = 0.95
 
     # games_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=30, loop_offset=0 + 2 * i)
 
@@ -337,213 +350,272 @@ for i in range(iterations):
     # query_dict: query name, deck, description
     # go through each game in list and see which is best
 
-    for k, v in games_dict.items():
+for k, v in games_dict.items():
+    
+    deck_data = list( \
+    list(set(tokenizer.tokenize(v['deck'].lower()))-stops) \
+    for v in games_dict.values() if tokenizer.tokenize(v['deck']) != [])
+
+    desc_data = list( \
+    list(set(tokenizer.tokenize(v['description'].lower()))-stops) \
+    for v in games_dict.values() if tokenizer.tokenize(v['description']) != [])
+
+    # check name
+    if query_name == v['name'] or query_name in v['name']:
+        model_sim = model.n_similarity(query_name, v['name'])
+        if model_sim >= model_sim_threshold:
+            sims[k] = model_sim
+
+    deck = list(set(tokenizer.tokenize(v['deck'])) - stops)
+    desc = list(set(tokenizer.tokenize(v['description'])) - stops) 
+    deck = [d.lower() for d in deck]
+    desc = [d.lower() for d in desc if d.isalpha()]
+
+    this_genre = []
+    this_theme = []
+    this_franchise = []
+
+    if k in ground_truth_dict:
+        this_genre = ground_truth_dict[k]['genres']
+        this_franchise = ground_truth_dict[k]['franchises']
+        this_theme = ground_truth_dict[k]['themes']
+    else:
+
+        genres = v['genres']
+
+        for genre in genres:
+            for k1, v1 in genre.items():
+                this_genre.append(v1)
+
+        themes = v['themes']
+
+        for theme in themes:
+            for k1, v1 in theme.items():
+                this_theme.append(v1)
+
+        franchises = v['franchises']
+
+        for franchise in franchises:
+            for k1, v1 in franchise.items():
+                this_franchise.append(v1)
+
+    # pdb.set_trace()
+
+    #pdb.set_trace()
+
+    # check the cosine similarity between the tokenized descriptions to get related games
+
+    min_deck_tokens = min(len(query_deck_data), len(deck))
+    min_desc_tokens = min(len(query_desc_data), len(desc))
+
+    min_deck_tokens = max(min_deck_tokens, 10)
+    min_desc_tokens = max(min_desc_tokens, 10)
+
+    #  pdb.set_trace()
+
+    if len(query_desc_data) >= min_deck_tokens and len(deck) >= min_deck_tokens:
+        model_sim = model.n_similarity(query_deck_data[0:min_deck_tokens], deck[0:min_deck_tokens])
+
+        if model_sim >=  model_sim_threshold:
+            sims[k] = model_sim
+
+    if len(query_desc_data) >= min_desc_tokens and len(desc) >= min_desc_tokens:
+        model_sim = model.n_similarity(query_desc_data[0:min_desc_tokens], desc[0:min_desc_tokens])
         
-        deck_data = list( \
-        list(set(tokenizer.tokenize(v['deck'].lower()))-stops) \
-        for v in games_dict.values() if tokenizer.tokenize(v['deck']) != [])
+        if model_sim >=  model_sim_threshold:
+            sims[k] = model_sim
 
-        desc_data = list( \
-        list(set(tokenizer.tokenize(v['description'].lower()))-stops) \
-        for v in games_dict.values() if tokenizer.tokenize(v['description']) != [])
+    # use genres, themes, and franchises
+    if len(genre_list) > 0 and len(this_genre) > 0:
 
-        # check name
-        if query_name == v['name'] or query_name in v['name']:
-            model_sim = model.n_similarity(query_name, v['name'])
-            if model_sim >= 0.8:
-                sims[k] = model_sim
+        for g in this_genre:
+            if g in genre_list:
+                model_sim = model.n_similarity(genre_list[0], g)
+                if model_sim >=  model_sim_threshold:
+                    sims[k] = model_sim
+                
 
-        deck = list(set(tokenizer.tokenize(v['deck'])) - stops)
-        desc = list(set(tokenizer.tokenize(v['description'])) - stops) 
-        deck = [d.lower() for d in deck]
-        desc = [d.lower() for d in desc if d.isalpha()]
+    if len(theme_list) > 0 and len(this_theme) > 0:
+        for g in this_theme:
+            if g in theme_list:
+                model_sim = model.n_similarity(theme_list[0], g)
+                if model_sim >=  model_sim_threshold:
+                    sims[k] = model_sim
 
-        this_genre = []
-        this_theme = []
-        this_franchise = []
+    if len(franchise_list) > 0 and len(this_franchise) > 0:
+        for g in this_franchise:
+            if g in franchise_list:
+                model_sim = model.n_similarity(franchise_list[0], g)
+                if model_sim >=  model_sim_threshold:
+                    sims[k] = model_sim
 
-        if k in ground_truth_dict:
-            this_genre = ground_truth_dict[k]['genres']
-            this_franchise = ground_truth_dict[k]['franchises']
-            this_theme = ground_truth_dict[k]['themes']
-        else:
+    #pdb.set_trace()
 
-            genres = v['genres']
+    # pdb.set_trace()
 
-            for genre in genres:
-                for k1, v1 in genre.items():
-                    this_genre.append(v1)
-
-            themes = v['themes']
-
-            for theme in themes:
-                for k1, v1 in theme.items():
-                    this_theme.append(v1)
-
-            franchises = v['franchises']
-
-            for franchise in franchises:
-                for k1, v1 in franchise.items():
-                    this_franchise.append(v1)
-
-        # pdb.set_trace()
-
-        #pdb.set_trace()
-
-        # check the cosine similarity between the tokenized descriptions to get related games
-
-        min_deck_tokens = min(len(query_deck_data), len(deck))
-        min_desc_tokens = min(len(query_desc_data), len(desc))
-
-        min_deck_tokens = max(min_deck_tokens, 10)
-        min_desc_tokens = max(min_desc_tokens, 10)
-
-        #  pdb.set_trace()
-
-        if len(query_desc_data) >= min_deck_tokens and len(deck) >= min_deck_tokens:
-            model_sim = model.n_similarity(query_deck_data[0:min_deck_tokens], deck[0:min_deck_tokens])
-
-            if model_sim >= 0.8:
-                sims[k] = model_sim
-
-        if len(query_desc_data) >= min_desc_tokens and len(desc) >= min_desc_tokens:
-            model_sim = model.n_similarity(query_desc_data[0:min_desc_tokens], desc[0:min_desc_tokens])
-            
-            if model_sim >= 0.8:
-                sims[k] = model_sim
-
-        # use genres, themes, and franchises
-        if len(genre_list) > 0 and len(this_genre) > 0:
-
-            for g in this_genre:
-                if g in genre_list:
-                    model_sim = model.n_similarity(genre_list[0], g)
-                    if model_sim >= 0.8:
-                        sims[k] = model_sim
-                    
-
-        if len(theme_list) > 0 and len(this_theme) > 0:
-            for g in this_theme:
-                if g in theme_list:
-                    model_sim = model.n_similarity(theme_list[0], g)
-                    if model_sim >= 0.8:
-                        sims[k] = model_sim
-
-        if len(franchise_list) > 0 and len(this_franchise) > 0:
-            for g in this_franchise:
-                if g in franchise_list:
-                    model_sim = model.n_similarity(franchise_list[0], g)
-                    if model_sim >= 0.8:
-                        sims[k] = model_sim
-
-        #pdb.set_trace()
-
-        # pdb.set_trace()
-
-        # print(sims)
-        max_sim = max(sims.values())
+print("sims")
+print(sims)
+pdb.set_trace()
+max_sim = max(sims.values())
 
         # print("look for similar games manually")
         # pdb.set_trace()
 
-        topX = 5
-        count = 0
-        for k, v in sims.items():
-            if v == max_sim and count < topX:
-                # print(k, v)
-                count += 1
-        
-        # pdb.set_trace()
-    print("sims so far")
-    print(sims)
-    pdb.set_trace()
-    games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, loop_offset=offset)
-    games_dict = games[0]
-    offset = games[1]
+topX = 5
+count = 0
+for k, v in sims.items():
+    if v == max_sim and count < topX:
+        # print(k, v)
+        count += 1
+    
+    # pdb.set_trace()
+#print("sims so far")
+#print(sims)
+#pdb.set_trace()
+#games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, loop_offset=offset)
+#games_dict = games[0]
+#offset = games[1]
 
-    print("check games_dict.keys()")
-    pdb.set_trace()
+print("check games_dict.keys()")
+pdb.set_trace()
 
 
-    # calculate precision and recall
-    # precision - correctly recommended items / total recommended items
-    # recall - correctly recommended items / total useful recommended items
-    # Let "useful" recommended items be any item that has the same genre, theme, or franchise
+# calculate precision and recall
+# precision - correctly recommended items / total recommended items
+# recall - correctly recommended items / total useful recommended items
+# Let "useful" recommended items be any item that has the same genre, theme, or franchise
 
-    # PR definition
-    # https://www.sciencedirect.com/science/article/pii/S1110866515000341#b0435
+# PR definition
+# https://www.sciencedirect.com/science/article/pii/S1110866515000341#b0435
 
-    # FIXME find recs not appearing in here
+#for i in similar_game_names:
+    #   for k, v in i.items():
+    #      if k in list(total_dict.keys()):
+    #         ground_truth_recs.append(k)
 
-    # total_dict = {** games_dict, ** ground_truth_dict}
-    # FIXME i have a list of dicts which is not working with list comprehension.
-    # So, maybe use list of lists, or consider other data structure
-    # Either way, try to get ground_truth_recs not empty
+ground_truth_recs = []
+ground_truth_recs.append(list(ground_truth_dict.keys())) # [['game1', 'game2']]
+ground_truth_recs = ground_truth_recs[0] # ['game1', 'game2']
 
-    #ground_truth_recs = 
+# ground_truth_recs = [i for i in similar_game_names if i in list(total_dict.keys())]
 
-    #for i in similar_game_names:
-     #   for k, v in i.items():
-      #      if k in list(total_dict.keys()):
-       #         ground_truth_recs.append(k)
+print("check ground truth recs var")
+pdb.set_trace()
 
-    ground_truth_recs = []
-    ground_truth_recs.append(list(ground_truth_dict.keys())) # [['game1', 'game2']]
-    ground_truth_recs = ground_truth_recs[0] # ['game1', 'game2']
+# recommender_results gets all ground truth games that were recommended from the dataset
+# total_recs gets all recommended from dataset
+ground_truth_in_recommender = [i for i in ground_truth_recs if i in sims.keys()]  
+total_recs = [i for i in sims.keys()]
 
-    # ground_truth_recs = [i for i in similar_game_names if i in list(total_dict.keys())]
+# get values of y_true and y_pred for confusion matrix
 
-    print("check ground truth recs var")
-    pdb.set_trace()
+y_pred = []
+y_true = []
 
-    # recommender_results gets all ground truth games that were recommended from the dataset
-    # total_recs gets all recommended from dataset
-    recommender_results = [i for i in ground_truth_recs if i in sims.keys()]  
-    total_recs = [i for i in sims.keys()]
+for k in games_dict.keys():
+    if k in total_recs:
+        y_pred.append(1)
+    else:
+        y_pred.append(0)
 
-    print("check recommender_results and total_recs")
-    pdb.set_trace()
+for i in games_dict.keys():
+    if i in ground_truth_recs:
+        y_true.append(1)
+    else:
+        y_true.append(0)
 
-    if len(ground_truth_recs) == 0:
-        print("ground truth recs len == 0")
-        exit()
+print("y_pred and y_true")
+print(y_pred)
+print(y_true)
 
-    # precision = correct recs in ground truth
-    # recall = correct recs / total recs
-    precision = min(len(recommender_results) / len(ground_truth_recs), 1)
-    recall = min(len(recommender_results) / len(total_recs), 1)
-
-    print("precision, recall")
-    #print(precision)
-    #print(recall)
-
-    # TODO try ROC curve to see what happens as precision/recall tradeoff is made
-
-    recs = list(sims.keys())
-
-    print("check division by 0 error")
-    pdb.set_trace()
-
-    tp_items = [i for i in recs if i in ground_truth_recs]
-    fp_items = [i for i in recs if i not in ground_truth_recs]
-    fn_items = [i for i in list(games_dict.keys()) if i not in recs and i in ground_truth_recs]
-    tn_items = [i for i in list(games_dict.keys()) if i not in recs and i not in ground_truth_recs]
-        
-    print("check items confusion matrix")
-    pdb.set_trace()
-
-    fpr = len(fp_items) / (len(fp_items) + len(tn_items))
-    tpr = len(tp_items) / (len(tp_items) + len(fn_items))
-
-    fpr_list.append(fpr)
-    tpr_list.append(tpr)
-
-    pdb.set_trace()
-
-# pdb.set_trace()
-
-plt.plot(fpr_list, tpr_list)
+cm = confusion_matrix(y_true, y_pred)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm,
+                            display_labels=None)
+disp.plot()
 plt.show()
 
-end_time = start_time - time
+#tp = cm[0][0]
+#fp = cm[0][1]
+#fn = cm[1][0]
+#tn = cm[1][1]
+
+#tpr = tp / (tp + fp)
+#fpr = tp / (tp + fn)
+#pdb.set_trace()
+
+#y_pred = [1 for i in total_recs if i in ground_truth_in_recommender else 0]
+#y_true = [1 for i in total_recs if i in ground_truth_recs else 0]
+
+#y_true = [True for i in recommender_results if i in ]
+
+print("check recommender_results and total_recs")
+pdb.set_trace()
+
+if len(ground_truth_recs) == 0:
+    print("ground truth recs len == 0")
+    exit()
+
+# precision = correct recs in ground truth
+# recall = correct recs / total recs
+#precision = min(len(ground_truth_in_recommender) / len(ground_truth_recs), 1)
+#recall = min(len(ground_truth_in_recommender) / len(total_recs), 1)
+
+#print("precision, recall")
+#print(precision)
+#print(recall)
+
+recs = list(sims.keys())
+
+#print("check division by 0 error")
+print("check recs sims.keys()")
+pdb.set_trace()
+
+#tp_items = [i for i in recs if i in ground_truth_recs]
+#fp_items = [i for i in recs if i not in ground_truth_recs]
+#fn_items = [i for i in list(games_dict.keys()) if i not in recs and i in ground_truth_recs]
+#tn_items = [i for i in list(games_dict.keys()) if i not in recs and i not in ground_truth_recs]
+    
+print("check items confusion matrix")
+pdb.set_trace()
+
+#fpr = len(fp_items) / (len(fp_items) + len(tn_items))
+#tpr = len(tp_items) / (len(tp_items) + len(fn_items))
+
+#fpr_list.append(fpr)
+#tpr_list.append(tpr)
+
+fpr, tpr, threshold = metrics.roc_curve(y_true, y_pred)
+roc_auc = metrics.auc(fpr, tpr)
+
+print(fpr)
+print(tpr)
+print("check fpr, tpr, how threshold is calculated")
+pdb.set_trace()
+
+print("check roc_auc")
+print("thresholds")
+print(threshold)
+pdb.set_trace()
+
+plt.title('Receiver Operating Characteristic')
+plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
+plt.legend(loc = 'lower right')
+plt.plot([0, 1], [0, 1],'r--')
+plt.xlim([0, 1])
+plt.ylim([0, 1])
+plt.ylabel('True Positive Rate')
+plt.xlabel('False Positive Rate')
+plt.show()
+
+# pdb.set_trace()
+# completely outside iterations loop now
+
+#plt.plot(fpr_list, tpr_list) # fpr is x axis, tpr is y axis
+#plt.xlim([0, 1])
+#plt.ylim([0, 1])
+#plt.show()
+
+# try sklearn
+
+end_time = time.time() - start_time
 print("seconds: ", end_time)
