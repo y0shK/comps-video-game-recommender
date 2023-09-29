@@ -27,6 +27,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import sklearn.metrics as metrics
 
 import matplotlib.pyplot as plt
+import random
 
 start_time = time.time()
 load_dotenv()
@@ -337,7 +338,13 @@ tpr_list = []
 # now we can see how many of ground truth are plucked by the recommender
 games_dict = {** games_dict, ** ground_truth_dict}
 
-print("fix games_dict")
+# randomly shuffle dictionary keys to mix ground truth games with games_dict
+# https://stackoverflow.com/questions/19895028/randomly-shuffling-a-dictionary-in-python
+temp_list = list(games_dict.items())
+random.shuffle(temp_list)
+games_dict = dict(temp_list)
+
+print("fix games_dict shuffle")
 pdb.set_trace()
 
 model_sim_threshold = 0.95
@@ -349,6 +356,14 @@ model_sim_threshold = 0.95
 
     # query_dict: query name, deck, description
     # go through each game in list and see which is best
+
+
+# track how many games in algorithm output are in the ground truth. Let n = # of games
+# also track how many games in algorithm output are not in ground truth. Let m = # of games
+# Show that as n increases, m also necessarily increases
+n_in_ground_truth = 0
+m_not_in_ground_truth = 0
+tpr_fpr_pairs = []
 
 for k, v in games_dict.items():
     
@@ -449,9 +464,27 @@ for k, v in games_dict.items():
                 if model_sim >=  model_sim_threshold:
                     sims[k] = model_sim
 
+    # if recommended, update our TPR and FPR information
+    if k in sims: # key exists
+        if k in ground_truth_dict:
+            n_in_ground_truth += 1
+        else:
+            m_not_in_ground_truth += 1
+    
+    #curr_pair = (n_in_ground_truth, m_not_in_ground_truth) # fpr first
+    curr_pair = (m_not_in_ground_truth, n_in_ground_truth)
+    tpr_fpr_pairs.append(curr_pair)
+
     #pdb.set_trace()
 
     # pdb.set_trace()
+
+# TODO basic idea seems to work - try to increase numbers to smoothen out curve
+plt.scatter(*zip(*tpr_fpr_pairs))
+plt.show()
+
+plt.plot(*zip(*tpr_fpr_pairs))
+plt.show()
 
 print("sims")
 print(sims)
@@ -467,7 +500,8 @@ for k, v in sims.items():
     if v == max_sim and count < topX:
         # print(k, v)
         count += 1
-    
+
+
     # pdb.set_trace()
 #print("sims so far")
 #print(sims)
@@ -584,6 +618,7 @@ pdb.set_trace()
 #fpr_list.append(fpr)
 #tpr_list.append(tpr)
 
+"""
 fpr, tpr, threshold = metrics.roc_curve(y_true, y_pred)
 roc_auc = metrics.auc(fpr, tpr)
 
@@ -596,6 +631,9 @@ print("check roc_auc")
 print("thresholds")
 print(threshold)
 pdb.set_trace()
+
+# https://stackoverflow.com/questions/25009284/how-to-plot-roc-curve-in-python
+# https://stackoverflow.com/questions/54099969/undefinedmetricwarning-no-positive-samples-in-y-true-true-positive-value-shoul
 
 plt.title('Receiver Operating Characteristic')
 plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
@@ -616,6 +654,7 @@ plt.show()
 #plt.show()
 
 # try sklearn
+"""
 
 end_time = time.time() - start_time
 print("seconds: ", end_time)
