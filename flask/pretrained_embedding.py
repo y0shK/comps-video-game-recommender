@@ -67,7 +67,7 @@ game_results = None
 num_results = search_json['number_of_page_results']
 game_not_found = True
 
-for i in range(min(num_results, 10)):
+for i in range(min(num_results, 5)):
     if search_json['results'][i]['deck'] != None and search_json['results'][i]['description'] != None \
     and game_not_found:
         game_results = search_json['results'][i]
@@ -118,10 +118,12 @@ game_api_results = game_api_json['results']
 # ground truth for similar_games
 similar_games_to_query = game_api_json['results']['similar_games']
 print("similar_games_to_query")
-pdb.set_trace()
+# pdb.set_trace()
 
 similar_game_names = []
-similar_threshold = min(len(similar_games_to_query), 10)
+game_count = 5
+similar_threshold = 5
+similar_threshold = min(len(similar_games_to_query), 5)
 
 for i in range(min(len(similar_games_to_query), similar_threshold)):
 # for i in range(len(similar_games_to_query)):
@@ -135,7 +137,7 @@ for i in range(min(len(similar_games_to_query), similar_threshold)):
 # append dict to games_dict
 # we have GUID from 
 print("similar games set trace")
-pdb.set_trace()
+# pdb.set_trace()
 
 # get ground truth games to avoid division by zero error
 # proof of concept - get 3, or as many as there are, whichever is less
@@ -147,16 +149,14 @@ if len(similar_game_names) == 0:
     print("no similar games found")
     exit()
 
-# TODO works with minimum of 2 and not minimum of 5. investigate why
-
 sample_game_len = min(len(similar_game_names), similar_threshold)
 # sample_game_len = len(similar_game_names)
 
 print(sample_game_len)
-pdb.set_trace()
+#pdb.set_trace()
 
 sample_similar_games = similar_game_names[0:sample_game_len]
-pdb.set_trace()
+#pdb.set_trace()
 
 def get_game_demographics(json_file, dict_key):
 
@@ -165,6 +165,8 @@ def get_game_demographics(json_file, dict_key):
     if dict_key not in results_json.keys():
         return ['']
     elif json_file['results'][dict_key] == None:
+        return ['']
+    elif json_file['results'][dict_key] == []:
         return ['']
     
     # else, the appropriate call can be made from the API
@@ -176,7 +178,7 @@ def get_game_demographics(json_file, dict_key):
 
     return call_list
 
-ground_truth_dict = {} # initialize here so that ground truth games are guaranteed
+similar_games_dict = {} # initialize here so that ground truth games are guaranteed
 
 print("check sg & sample_similar_games")
 #pdb.set_trace()
@@ -195,7 +197,7 @@ for sg in sample_similar_games:
         sample_results = sample_json['results']
 
         print("sample_results for: " + str(k))
-        pdb.set_trace()
+        # pdb.set_trace()
 
         for i in range(min(len(sample_results), 1)):
             name = sample_results['name']
@@ -219,32 +221,33 @@ for sg in sample_similar_games:
                 desc_str += entry
 
             print("check string deck and description")
-            pdb.set_trace()
+            # pdb.set_trace()
 
             genre_list = get_game_demographics(sample_json, 'genres')
             theme_list = get_game_demographics(sample_json, 'themes')
             franchise_list = get_game_demographics(sample_json, 'franchises')
 
-            ground_truth_dict[name] = {'name': name,
+            similar_games_dict[name] = {'name': name,
                          'deck': deck,
                          'description': desc,
                          'platforms': platforms,
                          'genres': genre_list,
                          'franchises': franchise_list,
-                         'themes': theme_list}
+                         'themes': theme_list,
+                         'recommended': 1} # used in y_true
 
             # print("check ground truth query_dict")
             # pdb.set_trace()
 
 
 print("check ground truth games")
-pdb.set_trace()
+#pdb.set_trace()
 
 genre_list = get_game_demographics(game_api_json, 'genres')
 theme_list = get_game_demographics(game_api_json, 'themes')
 franchise_list = get_game_demographics(game_api_json, 'franchises')
 
-pdb.set_trace()
+#pdb.set_trace()
 
 #pdb.set_trace()
 
@@ -258,7 +261,7 @@ query_dict[query_name] = {'name': query_name,
                          'themes': theme_list}
 
 print("check ground truth games & dataset games")
-pdb.set_trace()
+# pdb.set_trace()
 
 #pdb.set_trace()
 
@@ -291,7 +294,8 @@ def get_game_info(api_key, headers, offset):
                              'themes': game['themes'], 
                              'franchises': game['franchises'], 
                              'release_date': game['release_date'],
-                             'image': game['image']}
+                             'image': game['image'],
+                             'recommended' : 0} # used in y_true
     return game_data
 
 def get_games(api_key, headers, game_count=10, loop_offset=0):
@@ -304,8 +308,8 @@ def get_games(api_key, headers, game_count=10, loop_offset=0):
         
     return [games, new_offset]
 
-games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=3, loop_offset=0)
-games_dict = games[0]
+games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=5, loop_offset=0)
+dataset_games_dict = games[0]
 offset = games[1]
 
 # games_test_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=20)
@@ -325,29 +329,28 @@ import gensim.downloader
 model = gensim.downloader.load('glove-wiki-gigaword-50')
 #pdb.set_trace()
 
-
-# just use one iteration
-# then use sklearn metrics to do the AUC instead of manually doing iterations
-# this hopefully means that y_true is guaranteed to have ground_truth entries, hence not all 0s in y_true
-# so, tpr is a meaningful quantity?
 sims = {}
 fpr_list = []
 tpr_list = []
 
-# put ground truth games into the dataset game set
-# now we can see how many of ground truth are plucked by the recommender
-games_dict = {** games_dict, ** ground_truth_dict}
+# put similar_games GiantBomb API results into dataset games from GameSpot API
+total_games_dict = {** dataset_games_dict, ** similar_games_dict}
 
 # randomly shuffle dictionary keys to mix ground truth games with games_dict
 # https://stackoverflow.com/questions/19895028/randomly-shuffling-a-dictionary-in-python
-temp_list = list(games_dict.items())
+temp_list = list(total_games_dict.items())
 random.shuffle(temp_list)
-games_dict = dict(temp_list)
+total_games_dict = dict(temp_list)
+
+#pdb.set_trace()
+
+y_true = [v['recommended'] for k, v in total_games_dict.items()]
+
 
 print("fix games_dict shuffle")
-pdb.set_trace()
+#pdb.set_trace()
 
-model_sim_threshold = 0.95
+model_sim_threshold = 0.2
 
     # games_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=30, loop_offset=0 + 2 * i)
 
@@ -357,23 +360,34 @@ model_sim_threshold = 0.95
     # query_dict: query name, deck, description
     # go through each game in list and see which is best
 
+# Can't use ground truth inside algorithm guts. Instead, 
+# use definition of ROC curve.
+"""
+Start with thresholds - uniform list of floats
+0.1, 0.2, 0.3, ..., 0.9
+Max granularity is 1 / len(dataset)
+Then, from threshold, we get TP and FP (generated from threshold)
+Get those ordered pairs
+When we specify a TP and FP, do reverse lookup to get the threshold
+That threshold is what's used as cos similarity cutoff threshold
+Deliverable for demo: ROC curve handcrafted using this idea
+"""
 
-# track how many games in algorithm output are in the ground truth. Let n = # of games
-# also track how many games in algorithm output are not in ground truth. Let m = # of games
-# Show that as n increases, m also necessarily increases
-n_in_ground_truth = 0
-m_not_in_ground_truth = 0
-tpr_fpr_pairs = []
+thresholds = list(np.linspace(0.1, 1, 10)) # [0.1, 0.2, 0.3, ..., 1]
+thresholds = [round(i, 2) for i in thresholds]
 
-for k, v in games_dict.items():
-    
+y_cos_sim = []
+for k, v in total_games_dict.items():
+    model_sim_threshold = 0.9
+    model_sim = 0
+
     deck_data = list( \
     list(set(tokenizer.tokenize(v['deck'].lower()))-stops) \
-    for v in games_dict.values() if tokenizer.tokenize(v['deck']) != [])
+    for v in total_games_dict.values() if tokenizer.tokenize(v['deck']) != [])
 
     desc_data = list( \
     list(set(tokenizer.tokenize(v['description'].lower()))-stops) \
-    for v in games_dict.values() if tokenizer.tokenize(v['description']) != [])
+    for v in total_games_dict.values() if tokenizer.tokenize(v['description']) != [])
 
     # check name
     if query_name == v['name'] or query_name in v['name']:
@@ -390,27 +404,34 @@ for k, v in games_dict.items():
     this_theme = []
     this_franchise = []
 
-    if k in ground_truth_dict:
-        this_genre = ground_truth_dict[k]['genres']
-        this_franchise = ground_truth_dict[k]['franchises']
-        this_theme = ground_truth_dict[k]['themes']
-    else:
+    genres = v['genres']
 
-        genres = v['genres']
+    for genre in genres:
 
-        for genre in genres:
+        if isinstance(genre, str):
+            this_genre.append(genre)
+        elif isinstance(genre, dict):
+            
             for k1, v1 in genre.items():
                 this_genre.append(v1)
 
-        themes = v['themes']
+    themes = v['themes']
 
-        for theme in themes:
+    for theme in themes:
+        if isinstance(theme, str):
+            this_genre.append(theme)
+        elif isinstance(theme, dict):
+            
             for k1, v1 in theme.items():
                 this_theme.append(v1)
 
-        franchises = v['franchises']
+    franchises = v['franchises']
 
-        for franchise in franchises:
+    for franchise in franchises:
+        if isinstance(franchise, str):
+            this_genre.append(franchise)
+        elif isinstance(franchise, dict):
+            
             for k1, v1 in franchise.items():
                 this_franchise.append(v1)
 
@@ -419,6 +440,9 @@ for k, v in games_dict.items():
     #pdb.set_trace()
 
     # check the cosine similarity between the tokenized descriptions to get related games
+
+    # FIXME model_sim_threshold is obtained from ROC
+    # see photo from pictures/notes
 
     min_deck_tokens = min(len(query_deck_data), len(deck))
     min_desc_tokens = min(len(query_desc_data), len(desc))
@@ -463,36 +487,94 @@ for k, v in games_dict.items():
                 model_sim = model.n_similarity(franchise_list[0], g)
                 if model_sim >=  model_sim_threshold:
                     sims[k] = model_sim
-
-    # if recommended, update our TPR and FPR information
-    if k in sims: # key exists
-        if k in ground_truth_dict:
-            n_in_ground_truth += 1
-        else:
-            m_not_in_ground_truth += 1
     
-    #curr_pair = (n_in_ground_truth, m_not_in_ground_truth) # fpr first
-    curr_pair = (m_not_in_ground_truth, n_in_ground_truth)
-    tpr_fpr_pairs.append(curr_pair)
+    if model_sim > 0: # added cosine similarity to rec
+        y_cos_sim.append(model_sim)
+    else:
+        y_cos_sim.append(0) # not recommending
 
-    #pdb.set_trace()
+    print(y_cos_sim)
+            
+
+# calculate TPR and FPR using thresholds
+fpr = []
+tpr = []
+
+fp_tp_pairs = []
+
+# https://stats.stackexchange.com/questions/123124/how-to-determine-the-optimal-threshold-for-a-classifier-and-generate-roc-curve
+# https://stackoverflow.com/questions/61321778/how-to-calculate-tpr-and-fpr-in-python-without-using-sklearn
+# https://stackoverflow.com/questions/2951701/is-it-possible-to-use-else-in-a-list-comprehension
+# https://stackoverflow.com/questions/477486/how-do-i-use-a-decimal-step-value-for-range
+# https://stackoverflow.com/questions/4843173/how-to-check-if-type-of-a-variable-is-string
+
+reverse_lookup = {}
+
+for t in thresholds:
+
+    # use cosine similarity as probability
+    y_pred = [1 if i > t else 0 for i in y_cos_sim]
+    #tp = [i for i in y_pred if i == 1 and i == 1]
+    #fp = [i for i in y_pred if y_pred[i] == 1 and y_true[i] == 0]
+    #fn = [i for i in y_pred if y_pred[i] == 0 and y_true[i] == 1]
+    #tn = [i for i in y_pred if y_pred[i] == 0 and y_true[i] == 0]
+
+    tp = 0
+    fp = 0
+    fn = 0
+    tn = 0
+
+    for i in range(len(y_pred)):
+        if y_pred[i] == 1 and y_true[i] == 1:
+            tp += 1
+        elif y_pred[i] == 1 and y_true[i] == 0:
+            fp += 1
+        elif y_pred[i] == 0 and y_true[i] == 1:
+            fn += 1
+        elif y_pred[i] == 0 and y_true[i] == 0:
+            tn += 1
+
+
 
     # pdb.set_trace()
 
-# TODO basic idea seems to work - try to increase numbers to smoothen out curve
-plt.scatter(*zip(*tpr_fpr_pairs))
+    tpr = tp / (tp + fn)
+    fpr = fp / (fp + tn)
+
+    print((fpr, tpr))
+    fp_tp_pairs.append((fpr, tpr))
+
+    # save this fpr and tpr pair corresponding threshold value
+    # do this for reverse lookup table to pick a specific threshold from TPR, FPR vals
+
+    reverse_lookup[t] = (fpr, tpr)
+
+
+pdb.set_trace()
+print(reverse_lookup)
+
+fvals = []
+tvals = []
+for ft in fp_tp_pairs:
+    fvals.append(ft[0])
+    tvals.append(ft[1])
+
+lin_x = np.linspace(0.0, 1.0, 11)
+lin_y = np.linspace(0.0, 1.0, 11)
+
+plt.plot(fvals, tvals)
+plt.plot(lin_x, lin_y, label='linear')  # Plot some data on the (implicit) axes.
+plt.xlabel("FPR")
+plt.ylabel("TPR")
+plt.title("ROC curve")
 plt.show()
 
-plt.plot(*zip(*tpr_fpr_pairs))
-plt.show()
+print(fp_tp_pairs)
 
 print("sims")
 print(sims)
 pdb.set_trace()
 max_sim = max(sims.values())
-
-        # print("look for similar games manually")
-        # pdb.set_trace()
 
 topX = 5
 count = 0
@@ -501,160 +583,24 @@ for k, v in sims.items():
         # print(k, v)
         count += 1
 
+print("y_pred")
+print(y_pred[0:10])
+print("y_true")
+print(y_true[0:10])
+pdb.set_trace()
 
-    # pdb.set_trace()
+"""
+Now, if we want to choose a specific point on the curve,
+just re-run a new trial using that threshold (access TPR and FPR based on reverse_lookup)
+"""
+
+# pdb.set_trace()
 #print("sims so far")
 #print(sims)
 #pdb.set_trace()
 #games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, loop_offset=offset)
 #games_dict = games[0]
 #offset = games[1]
-
-print("check games_dict.keys()")
-pdb.set_trace()
-
-
-# calculate precision and recall
-# precision - correctly recommended items / total recommended items
-# recall - correctly recommended items / total useful recommended items
-# Let "useful" recommended items be any item that has the same genre, theme, or franchise
-
-# PR definition
-# https://www.sciencedirect.com/science/article/pii/S1110866515000341#b0435
-
-#for i in similar_game_names:
-    #   for k, v in i.items():
-    #      if k in list(total_dict.keys()):
-    #         ground_truth_recs.append(k)
-
-ground_truth_recs = []
-ground_truth_recs.append(list(ground_truth_dict.keys())) # [['game1', 'game2']]
-ground_truth_recs = ground_truth_recs[0] # ['game1', 'game2']
-
-# ground_truth_recs = [i for i in similar_game_names if i in list(total_dict.keys())]
-
-print("check ground truth recs var")
-pdb.set_trace()
-
-# recommender_results gets all ground truth games that were recommended from the dataset
-# total_recs gets all recommended from dataset
-ground_truth_in_recommender = [i for i in ground_truth_recs if i in sims.keys()]  
-total_recs = [i for i in sims.keys()]
-
-# get values of y_true and y_pred for confusion matrix
-
-y_pred = []
-y_true = []
-
-for k in games_dict.keys():
-    if k in total_recs:
-        y_pred.append(1)
-    else:
-        y_pred.append(0)
-
-for i in games_dict.keys():
-    if i in ground_truth_recs:
-        y_true.append(1)
-    else:
-        y_true.append(0)
-
-print("y_pred and y_true")
-print(y_pred)
-print(y_true)
-
-cm = confusion_matrix(y_true, y_pred)
-disp = ConfusionMatrixDisplay(confusion_matrix=cm,
-                            display_labels=None)
-disp.plot()
-plt.show()
-
-#tp = cm[0][0]
-#fp = cm[0][1]
-#fn = cm[1][0]
-#tn = cm[1][1]
-
-#tpr = tp / (tp + fp)
-#fpr = tp / (tp + fn)
-#pdb.set_trace()
-
-#y_pred = [1 for i in total_recs if i in ground_truth_in_recommender else 0]
-#y_true = [1 for i in total_recs if i in ground_truth_recs else 0]
-
-#y_true = [True for i in recommender_results if i in ]
-
-print("check recommender_results and total_recs")
-pdb.set_trace()
-
-if len(ground_truth_recs) == 0:
-    print("ground truth recs len == 0")
-    exit()
-
-# precision = correct recs in ground truth
-# recall = correct recs / total recs
-#precision = min(len(ground_truth_in_recommender) / len(ground_truth_recs), 1)
-#recall = min(len(ground_truth_in_recommender) / len(total_recs), 1)
-
-#print("precision, recall")
-#print(precision)
-#print(recall)
-
-recs = list(sims.keys())
-
-#print("check division by 0 error")
-print("check recs sims.keys()")
-pdb.set_trace()
-
-#tp_items = [i for i in recs if i in ground_truth_recs]
-#fp_items = [i for i in recs if i not in ground_truth_recs]
-#fn_items = [i for i in list(games_dict.keys()) if i not in recs and i in ground_truth_recs]
-#tn_items = [i for i in list(games_dict.keys()) if i not in recs and i not in ground_truth_recs]
-    
-print("check items confusion matrix")
-pdb.set_trace()
-
-#fpr = len(fp_items) / (len(fp_items) + len(tn_items))
-#tpr = len(tp_items) / (len(tp_items) + len(fn_items))
-
-#fpr_list.append(fpr)
-#tpr_list.append(tpr)
-
-"""
-fpr, tpr, threshold = metrics.roc_curve(y_true, y_pred)
-roc_auc = metrics.auc(fpr, tpr)
-
-print(fpr)
-print(tpr)
-print("check fpr, tpr, how threshold is calculated")
-pdb.set_trace()
-
-print("check roc_auc")
-print("thresholds")
-print(threshold)
-pdb.set_trace()
-
-# https://stackoverflow.com/questions/25009284/how-to-plot-roc-curve-in-python
-# https://stackoverflow.com/questions/54099969/undefinedmetricwarning-no-positive-samples-in-y-true-true-positive-value-shoul
-
-plt.title('Receiver Operating Characteristic')
-plt.plot(fpr, tpr, 'b', label = 'AUC = %0.2f' % roc_auc)
-plt.legend(loc = 'lower right')
-plt.plot([0, 1], [0, 1],'r--')
-plt.xlim([0, 1])
-plt.ylim([0, 1])
-plt.ylabel('True Positive Rate')
-plt.xlabel('False Positive Rate')
-plt.show()
-
-# pdb.set_trace()
-# completely outside iterations loop now
-
-#plt.plot(fpr_list, tpr_list) # fpr is x axis, tpr is y axis
-#plt.xlim([0, 1])
-#plt.ylim([0, 1])
-#plt.show()
-
-# try sklearn
-"""
 
 end_time = time.time() - start_time
 print("seconds: ", end_time)
