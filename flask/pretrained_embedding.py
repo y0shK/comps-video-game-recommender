@@ -29,6 +29,9 @@ import sklearn.metrics as metrics
 import matplotlib.pyplot as plt
 import random
 
+from gensim.test.utils import common_texts
+from gensim.corpora.dictionary import Dictionary
+
 start_time = time.time()
 load_dotenv()
 session = requests_cache.CachedSession("pretrained_embeddings_cache")
@@ -92,7 +95,9 @@ game_platforms = game_results['platforms']
 
 GUID = game_results['guid']
 
-#pdb.set_trace()
+
+# try to get GameSpot review for query game
+pdb.set_trace()
 
 tokenizer = RegexpTokenizer(r'\w+')
 stops = set(stopwords.words("english"))
@@ -120,11 +125,7 @@ game_api_json = json.loads(game_api_resp.text)
 game_api_results = game_api_json['results']
 
 print("game_api_results")
-pdb.set_trace()
-
-# FIXME some games like Super Mario Bros don't have user reviews. Then consider how I can use reviews from gamespot
-# Maybe get review from this some other way, with another API. Can try getting review from gamespot?
-#game_review = game_api_results['reviews']
+#pdb.set_trace()
 
 # ground truth for similar_games
 similar_games_to_query = game_api_json['results']['similar_games']
@@ -133,8 +134,8 @@ print("similar_games_to_query")
 
 similar_game_names = []
 game_count = 5
-similar_threshold = 5
-similar_threshold = min(len(similar_games_to_query), 5)
+#similar_threshold = 5
+similar_threshold = len(similar_games_to_query) #min(len(similar_games_to_query), 5)
 
 for i in range(min(len(similar_games_to_query), similar_threshold)):
 # for i in range(len(similar_games_to_query)):
@@ -212,10 +213,16 @@ for sg in sample_similar_games:
 
         for i in range(min(len(sample_results), 1)):
             name = sample_results['name']
-            deck = sample_results['deck']
-            desc = sample_results['description']
-            platforms = sample_results['platforms']
-            reviews = sample_results['reviews']
+
+            if sample_results['deck'] != None:
+                deck = sample_results['deck']
+
+            if sample_results['description'] != None:
+                desc = sample_results['description']
+
+            if sample_results['platforms'] != None:
+                platforms = sample_results['platforms']
+            # reviews = sample_results['reviews']
 
 
             deck_data = list(set(tokenizer.tokenize(deck.lower())) - stops)
@@ -257,7 +264,7 @@ for sg in sample_similar_games:
                          'genres': genre_list,
                          'franchises': franchise_list,
                          'themes': theme_list,
-                         'reviews': reviews,
+                         'review': None,
                          'recommended': 1} # used in y_true
 
             # print("check ground truth query_dict")
@@ -301,69 +308,75 @@ Returns: game_data (dict): key=name and value=
 def get_game_info(api_key, headers, offset):
 
     # try reviews
-    rev_url = "http://www.gamespot.com/api/reviews/?api_key=" + api_key + "&format=json"
-    rev_call = session.get(rev_url, headers=headers)
-    rev_json = json.loads(rev_call.text)
-    print("rev trace")
+    #rev_url = "http://www.gamespot.com/api/reviews/?api_key=" + api_key + "&format=json"
+    #rev_call = session.get(rev_url, headers=headers)
+    #rev_json = json.loads(rev_call.text)
+    #print("rev trace")
     # pdb.set_trace()
     #pdb.set_trace()
 
     game_data = {}
 
-    for rev in rev_json['results']:
-        game_api_url = rev['game']['api_detail_url'] + "&api_key=" + api_key + "&format=json"
-        game_call = session.get(game_api_url, headers=headers)
-        game_json = json.loads(game_call.text)
+    game_url = "http://www.gamespot.com/api/games/?api_key=" + api_key + "&format=json" + \
+        "&offset=" + str(offset)
+    game_call = session.get(game_url, headers=headers) 
+    game_json = json.loads(game_call.text)['results']
 
-        print("include review")
+    #for rev in rev_json['results']:
+        #game_api_url = rev['game']['api_detail_url'] + "&api_key=" + api_key + "&format=json"
+        #game_call = session.get(game_api_url, headers=headers)
+        #game_json = json.loads(game_call.text)
+
+        #print("include review")
         #pdb.set_trace()
 
-        for game in game_json['results']:
-            
-            print("include game")
+    for game in game_json:
+        
+        print("include game")
+        #pdb.set_trace()
+
+        """
+        game_url = "http://www.gamespot.com/api/games/?api_key=" + api_key + "&format=json" + \
+        "&offset=" + str(offset)
+        game_call = session.get(game_url, headers=headers) 
+        game_json = json.loads(game_call.text)['results']
+        print("game info pdb set trace")
+        pdb.set_trace()
+
+        game_data = {}
+        for game in game_json:
+
+            review_foreign_key = game['reviews_api_url'][45:]
+            review_url = "http://www.gamespot.com/api/reviews/?api_key=" + api_key + "&format=json" + \
+            "&association:" + str(game['id'])
+            #"&" + review_foreign_key
+            print(review_url)
             #pdb.set_trace()
-    
-            """
-            game_url = "http://www.gamespot.com/api/games/?api_key=" + api_key + "&format=json" + \
-            "&offset=" + str(offset)
-            game_call = session.get(game_url, headers=headers) 
-            game_json = json.loads(game_call.text)['results']
-            print("game info pdb set trace")
+
+            review_call = session.get(review_url, headers=headers)
+            review_json = json.loads(review_call.text)
+            print("check review fk from gamespot")
             pdb.set_trace()
 
-            game_data = {}
-            for game in game_json:
+            #print(review_json['results'])
 
-                review_foreign_key = game['reviews_api_url'][45:]
-                review_url = "http://www.gamespot.com/api/reviews/?api_key=" + api_key + "&format=json" + \
-                "&association:" + str(game['id'])
-                #"&" + review_foreign_key
-                print(review_url)
-                #pdb.set_trace()
+            #pdb.set_trace()
 
-                review_call = session.get(review_url, headers=headers)
-                review_json = json.loads(review_call.text)
-                print("check review fk from gamespot")
-                pdb.set_trace()
+            # review_url = "http://www.gamespot.com/api/reviews/?api_key=" + api_key + "&format=json" + \
+        """
 
-                #print(review_json['results'])
-
-                #pdb.set_trace()
-
-                # review_url = "http://www.gamespot.com/api/reviews/?api_key=" + api_key + "&format=json" + \
-            """
-
-            game_data[game['name']] = {'id': game['id'], 
-                             'name': game['name'],
-                             'deck': game['deck'],
-                             'description': game['description'], 
-                             'genres': game['genres'], 
-                             'themes': game['themes'], 
-                             'franchises': game['franchises'], 
-                             'release_date': game['release_date'],
-                             'image': game['image'],
-                             'review': rev['body'],
-                             'recommended' : 0} # used in y_true
+        game_data[game['name']] = {'id': game['id'], 
+                            'name': game['name'],
+                            'deck': game['deck'],
+                            'description': game['description'], 
+                            'genres': game['genres'], 
+                            'themes': game['themes'], 
+                            'franchises': game['franchises'], 
+                            'release_date': game['release_date'],
+                            'image': game['image'],
+                            #'review': rev['body'],
+                            'review': None,
+                            'recommended' : 0} # used in y_true
     return game_data
 
 def get_games(api_key, headers, game_count=10, loop_offset=0):
@@ -396,7 +409,7 @@ If the cosine similarity is greater than the threshold, return the game
 import gensim.downloader
 model = gensim.downloader.load('glove-wiki-gigaword-50')
 print("check model")
-pdb.set_trace()
+#pdb.set_trace()
 
 sims = {}
 fpr_list = []
@@ -451,155 +464,72 @@ reasons_dict = {
     'desc': 0,
     'genre': 0,
     'franchise': 0,
-    'theme': 0
+    'theme': 0,
+    'rev': 0
 }
 
 y_cos_sim = []
+
+uniq_words = {}
+
+# recommendation algorithm
+
 for k, v in total_games_dict.items():
-    model_sim_threshold = 0.9
+    
     model_sim = 0
-
-    deck_data = list( \
-    list(set(tokenizer.tokenize(v['deck'].lower()))-stops) \
-    for v in total_games_dict.values() if tokenizer.tokenize(v['deck']) != [])
-
-    desc_data = list( \
-    list(set(tokenizer.tokenize(v['description'].lower()))-stops) \
-    for v in total_games_dict.values() if tokenizer.tokenize(v['description']) != [])
-
-    # check name
-    # TODO match this instead of using cos sim
-    if query_name == v['name'] or query_name in v['name']:
-        #model_sim = model.n_similarity(query_name, v['name'])
-        sims[k] = model_sim
-
-        #if model_sim >= model_sim_threshold:
-         #   sims[k] = model_sim
-          #  print("name ", model_sim)
-           # reasons_dict['name'] += 1
 
     deck = list(set(tokenizer.tokenize(v['deck'])) - stops)
     desc = list(set(tokenizer.tokenize(v['description'])) - stops) 
+
+    """
+    if v['review'] != None:
+        rev = list(set(tokenizer.tokenize(v['review'])) - stops)
+        rev = [d.lower() for d in rev]
+    else:
+        rev = None
+    """
+    
     deck = [d.lower() for d in deck]
-    desc = [d.lower() for d in desc if d.isalpha()]
-
-    this_genre = []
-    this_theme = []
-    this_franchise = []
-
-    genres = v['genres']
-
-    for genre in genres:
-
-        if isinstance(genre, str):
-            this_genre.append(genre)
-        elif isinstance(genre, dict):
-            
-            for k1, v1 in genre.items():
-                this_genre.append(v1)
-
-    themes = v['themes']
-
-    for theme in themes:
-        if isinstance(theme, str):
-            this_genre.append(theme)
-        elif isinstance(theme, dict):
-            
-            for k1, v1 in theme.items():
-                this_theme.append(v1)
-
-    franchises = v['franchises']
-
-    for franchise in franchises:
-        if isinstance(franchise, str):
-            this_genre.append(franchise)
-        elif isinstance(franchise, dict):
-            
-            for k1, v1 in franchise.items():
-                this_franchise.append(v1)
-
-    # pdb.set_trace()
-
-    #pdb.set_trace()
-
-    # check the cosine similarity between the tokenized descriptions to get related games
-
-    # FIXME model_sim_threshold is obtained from ROC
-    # see photo from pictures/notes
+    desc = [d.lower() for d in desc if d.isalpha() and len(d) > 1]
 
     min_deck_tokens = min(len(query_deck_data), len(deck))
     min_desc_tokens = min(len(query_desc_data), len(desc))
 
-    min_deck_tokens = max(min_deck_tokens, 10)
-    min_desc_tokens = max(min_desc_tokens, 10)
-
-    #  pdb.set_trace()
+    min_deck_tokens = max(min_deck_tokens, 1)
+    min_desc_tokens = max(min_desc_tokens, 1)
 
     if len(query_deck_data) >= min_deck_tokens and len(deck) >= min_deck_tokens:
-        #model_sim = model.n_similarity(query_deck_data[0:min_deck_tokens], deck[0:min_deck_tokens])
         model_sim = model.n_similarity(query_deck_data, deck)
-
-        if model_sim >=  model_sim_threshold:
+        if model_sim >= 0.9:
             sims[k] = model_sim
-            print("deck ", model_sim)
             reasons_dict['deck'] += 1
-
-    
+        
     if len(query_desc_data) >= min_desc_tokens and len(desc) >= min_desc_tokens:
-        #model_sim = model.n_similarity(query_desc_data[0:min_desc_tokens], desc[0:min_desc_tokens])
         model_sim = model.n_similarity(query_desc_data, desc)
-
-        if model_sim >=  model_sim_threshold:
+        if model_sim >= 0.9:
             sims[k] = model_sim
-
-            print("desc ", model_sim)
             reasons_dict['desc'] += 1
 
-    # use genres, themes, and franchises
-    # TODO match these instead of using cos sim
-    if len(genre_list) > 0 and len(this_genre) > 0:
+    """
+    if rev != None and len(rev) > 1:
+        if model.n_similarity(rev, query_desc_data + query_deck_data) > 0.9:
+            model_sim = model.n_similarity(rev, query_desc_data + query_deck_data)
+            sims[k] = model_sim
+            reasons_dict['rev'] += 1
+    """
 
-        for g in this_genre:
-            if g in genre_list:
-                #model_sim = model.n_similarity(genre_list[0], g)
-                #if model_sim >=  model_sim_threshold:
-                sims[k] = model_sim
+    # tokenize review and see if any words match
 
-                    #print("genre ", model_sim)
-                    #reasons_dict['genre'] += 1
-                
-
-    if len(theme_list) > 0 and len(this_theme) > 0:
-        for g in this_theme:
-            if g in theme_list:
-                #model_sim = model.n_similarity(theme_list[0], g)
-                #if model_sim >=  model_sim_threshold:
-                sims[k] = model_sim
-
-               #     print("theme ", model_sim)
-                #    reasons_dict['theme'] += 1
-
-    if len(franchise_list) > 0 and len(this_franchise) > 0:
-        for g in this_franchise:
-            if g in franchise_list:
-                #model_sim = model.n_similarity(franchise_list[0], g)
-                #if model_sim >=  model_sim_threshold:
-                sims[k] = model_sim
-
-                    #print("franchise ", model_sim)
-                    #reasons_dict['franchise'] += 1
-    
-    # use reviews for cosine similarity as well
-    # if 
 
     if model_sim > 0: # added cosine similarity to rec
         y_cos_sim.append(model_sim)
     else:
         y_cos_sim.append(0) # not recommending
 
-    print(y_cos_sim)
+    # print(y_cos_sim)
             
-
+print("check uniq words")
+pdb.set_trace()
 
 print("check reasons for adding to sims")
 print(reasons_dict)
@@ -618,6 +548,11 @@ fp_tp_pairs = []
 # https://stackoverflow.com/questions/4843173/how-to-check-if-type-of-a-variable-is-string
 
 reverse_lookup = {}
+
+tp_tot = 0
+fp_tot = 0
+fn_tot = 0
+tn_tot = 0
 
 for t in thresholds:
 
@@ -643,7 +578,10 @@ for t in thresholds:
         elif y_pred[i] == 0 and y_true[i] == 0:
             tn += 1
 
-
+    tp_tot += tp
+    fp_tot += fp
+    fn_tot += fn
+    tn_tot += tn
 
     # pdb.set_trace()
 
@@ -658,6 +596,8 @@ for t in thresholds:
 
     reverse_lookup[t] = (fpr, tpr)
 
+print("tp, fp, fn, tn")
+print(tp_tot, fp_tot, fn_tot, tn_tot)
 
 pdb.set_trace()
 print(reverse_lookup)
@@ -712,13 +652,5 @@ just re-run a new trial using that threshold (access TPR and FPR based on revers
 #offset = games[1]
 
 end_time = time.time() - start_time
-print("seconds: ", end_time)
-
-# TODO
-# 1. try getting reviews and then use cosine similarity
-    # get review based on GUID
-    # then use review as part of algo.
-    # cos sim deck, desc, and review
-    # match (w ==) everything else
-# 2. try using things other than cosine similarity
-# (consider dating analogy)
+# print("seconds: ", end_time)
+print("minutes: ", end_time / 60)
