@@ -44,11 +44,14 @@ GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 # input game X
 # QUERY = "klonoa door to phantomile"
 # QUERY = "super mario rpg"
-# QUERY = "vampire the masquerade"
-# QUERY = "sid meier civilization iv"
+#QUERY = "vampire the masquerade"
+#QUERY = "sid meier civilization"
+#QUERY = "ultima"
+#QUERY = "team fortress 2"
 #QUERY = "final fantasy"
-# QUERY = "baldur's gate"
+#QUERY = "baldur's gate"
 QUERY = "super mario bros"
+#QUERY = "pokemon red"
 
 # https://www.giantbomb.com/api/documentation/#toc-0-17
 search_api_url = "https://www.giantbomb.com/api/search/?api_key=" + GIANTBOMB_API_KEY + \
@@ -87,17 +90,31 @@ pdb.set_trace()
 query_name = game_results['name']
 game_deck = game_results['deck']
 game_desc = game_results['description']
-# game_review = game_results['reviews']
-
 game_platforms = game_results['platforms']
 
 #pdb.set_trace()
 
 GUID = game_results['guid']
 
+def gamespot_api_call(url, api_key=GAMESPOT_API_KEY, headers=HEADERS, offset=0):
+    new_u = url + "&api_key=" + api_key + \
+    "&format=json"
+    new_c = session.get(new_u, headers=HEADERS)
+    new_j = json.loads(new_c.text)['results']
+
+    return new_j
+
+pdb.set_trace()
 
 # try to get GameSpot review for query game
-pdb.set_trace()
+
+#query_rev_url = "http://www.gamespot.com/api/games/?api_key=" + GAMESPOT_API_KEY + \
+ #   "&format=json&filter=name:" + query_name
+#query_rev_call = session.get(query_rev_url, headers=HEADERS) 
+#query_json = json.loads(query_rev_call.text)['results']
+
+#print("check query review GameSpot")
+#pdb.set_trace()
 
 tokenizer = RegexpTokenizer(r'\w+')
 stops = set(stopwords.words("english"))
@@ -127,6 +144,10 @@ game_api_results = game_api_json['results']
 print("game_api_results")
 #pdb.set_trace()
 
+query_genre = game_api_results['genres'][0]['name']
+query_theme = game_api_results['themes'][0]['name']
+query_franchise = game_api_results['franchises'][0]['name']
+
 # ground truth for similar_games
 similar_games_to_query = game_api_json['results']['similar_games']
 print("similar_games_to_query")
@@ -135,9 +156,9 @@ print("similar_games_to_query")
 similar_game_names = []
 game_count = 5
 #similar_threshold = 5
-similar_threshold = len(similar_games_to_query) #min(len(similar_games_to_query), 5)
+#similar_threshold = len(similar_games_to_query) #min(len(similar_games_to_query), 5)
 
-for i in range(min(len(similar_games_to_query), similar_threshold)):
+for i in range(len(similar_games_to_query)):
 # for i in range(len(similar_games_to_query)):
     name = similar_games_to_query[i]['name']
     guid_val = similar_games_to_query[i]['api_detail_url'][35:-1] # check pdb for confirmation
@@ -161,13 +182,7 @@ if len(similar_game_names) == 0:
     print("no similar games found")
     exit()
 
-sample_game_len = min(len(similar_game_names), similar_threshold)
-# sample_game_len = len(similar_game_names)
-
-print(sample_game_len)
-#pdb.set_trace()
-
-sample_similar_games = similar_game_names[0:sample_game_len]
+sample_similar_games = similar_game_names
 #pdb.set_trace()
 
 def get_game_demographics(json_file, dict_key):
@@ -216,28 +231,18 @@ for sg in sample_similar_games:
 
             if sample_results['deck'] != None:
                 deck = sample_results['deck']
+                deck_data = list(set(tokenizer.tokenize(deck.lower())) - stops)
+            else:
+                deck = ''
+                deck_data = ''
 
             if sample_results['description'] != None:
                 desc = sample_results['description']
-
-            if sample_results['platforms'] != None:
-                platforms = sample_results['platforms']
-            # reviews = sample_results['reviews']
-
-
-            deck_data = list(set(tokenizer.tokenize(deck.lower())) - stops)
-            desc_data = list(set(tokenizer.tokenize(desc.lower())) - stops)
-            desc_data = [desc for desc in desc_data if desc.isalpha()]
-
-            deck_str = ''
-            for d in deck_data:
-                entry = d + " "
-                deck_str += entry
-            
-            desc_str = ''
-            for d in desc_data:
-                entry = d + " "
-                desc_str += entry
+                desc_data = list(set(tokenizer.tokenize(desc.lower())) - stops)
+                desc_data = [desc for desc in desc_data if desc.isalpha()]
+            else:
+                desc = ''
+                desc_data = ''
 
             print("check string deck and description")
             # pdb.set_trace()
@@ -260,7 +265,7 @@ for sg in sample_similar_games:
             similar_games_dict[name] = {'name': name,
                          'deck': deck,
                          'description': desc,
-                         'platforms': platforms,
+                         #'platforms': platforms,
                          'genres': genre_list,
                          'franchises': franchise_list,
                          'themes': theme_list,
@@ -374,22 +379,20 @@ def get_game_info(api_key, headers, offset):
                             'franchises': game['franchises'], 
                             'release_date': game['release_date'],
                             'image': game['image'],
-                            #'review': rev['body'],
-                            'review': None,
                             'recommended' : 0} # used in y_true
     return game_data
 
-def get_games(api_key, headers, game_count=10, loop_offset=0):
+def get_games(api_key, headers, game_count=10):
     # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
     games = {}
     for i in range(game_count):
-        new_offset = i*99 + loop_offset
+        new_offset = i*99
         new_games = get_game_info(api_key=api_key, headers=headers, offset=new_offset)
         games = {**games, **new_games}
         
     return [games, new_offset]
 
-games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=5, loop_offset=0)
+games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=200)
 dataset_games_dict = games[0]
 offset = games[1]
 
@@ -452,8 +455,6 @@ When we specify a TP and FP, do reverse lookup to get the threshold
 That threshold is what's used as cos similarity cutoff threshold
 Deliverable for demo: ROC curve handcrafted using this idea
 """
-
-#thresholds = list(np.linspace(0.1, 1, 10000)) # [0.01, 0.02, ..., 0.99]
 thresholds = list(np.linspace(0.1, 1, 100))
 thresholds = [round(i, 2) for i in thresholds]
 
@@ -470,24 +471,15 @@ reasons_dict = {
 
 y_cos_sim = []
 
-uniq_words = {}
-
 # recommendation algorithm
 
+model_sim_threshold = 0.9
 for k, v in total_games_dict.items():
     
     model_sim = 0
 
     deck = list(set(tokenizer.tokenize(v['deck'])) - stops)
     desc = list(set(tokenizer.tokenize(v['description'])) - stops) 
-
-    """
-    if v['review'] != None:
-        rev = list(set(tokenizer.tokenize(v['review'])) - stops)
-        rev = [d.lower() for d in rev]
-    else:
-        rev = None
-    """
     
     deck = [d.lower() for d in deck]
     desc = [d.lower() for d in desc if d.isalpha() and len(d) > 1]
@@ -500,23 +492,78 @@ for k, v in total_games_dict.items():
 
     if len(query_deck_data) >= min_deck_tokens and len(deck) >= min_deck_tokens:
         model_sim = model.n_similarity(query_deck_data, deck)
-        if model_sim >= 0.9:
+        if model_sim >= model_sim_threshold:
             sims[k] = model_sim
             reasons_dict['deck'] += 1
         
     if len(query_desc_data) >= min_desc_tokens and len(desc) >= min_desc_tokens:
         model_sim = model.n_similarity(query_desc_data, desc)
-        if model_sim >= 0.9:
+        if model_sim >= model_sim_threshold:
             sims[k] = model_sim
             reasons_dict['desc'] += 1
 
-    """
-    if rev != None and len(rev) > 1:
-        if model.n_similarity(rev, query_desc_data + query_deck_data) > 0.9:
-            model_sim = model.n_similarity(rev, query_desc_data + query_deck_data)
-            sims[k] = model_sim
-            reasons_dict['rev'] += 1
-    """
+
+    # if genre, franchise, or theme adds a game,
+    # use deck + desc vs query deck/desc to see its cosine similarity, and add it anyway
+    for g in v['genres']:
+
+        if isinstance(g, str):
+            if query_genre == g:
+
+                #model_sim = model.n_similarity(query_desc_data, desc)
+                #sims[k] = model_sim
+                
+                model_sim = 1 # add game
+                reasons_dict['genre'] += 1
+
+        elif isinstance(g, dict):
+            if query_genre in g.values():
+                
+                #model_sim = model.n_similarity(query_desc_data, desc)
+                #sims[k] = model_sim
+                
+                model_sim = 1
+                reasons_dict['genre'] += 1
+    
+    for g in v['themes']:
+
+        if isinstance(g, str):
+            if query_theme == g:
+
+                #model_sim = model.n_similarity(query_desc_data, desc)
+                #sims[k] = model_sim
+                
+                model_sim = 1 # add game
+                reasons_dict['theme'] += 1
+
+        elif isinstance(g, dict):
+            if query_theme in g.values():
+                
+                #model_sim = model.n_similarity(query_desc_data, desc)
+                #sims[k] = model_sim
+
+                model_sim = 1
+                reasons_dict['theme'] += 1
+    
+    for g in v['franchises']:
+
+        if isinstance(g, str):
+            if query_franchise == g:
+
+                #model_sim = model.n_similarity(query_desc_data, desc)
+                #sims[k] = model_sim
+                
+                model_sim = 1 # add game
+                reasons_dict['franchise'] += 1
+
+        elif isinstance(g, dict):
+            if query_franchise in g.values():
+                
+                #model_sim = model.n_similarity(query_desc_data, desc)
+                #sims[k] = model_sim
+
+                model_sim = 1
+                reasons_dict['franchise'] += 1
 
     # tokenize review and see if any words match
 
@@ -558,10 +605,6 @@ for t in thresholds:
 
     # use cosine similarity as probability
     y_pred = [1 if i > t else 0 for i in y_cos_sim]
-    #tp = [i for i in y_pred if i == 1 and i == 1]
-    #fp = [i for i in y_pred if y_pred[i] == 1 and y_true[i] == 0]
-    #fn = [i for i in y_pred if y_pred[i] == 0 and y_true[i] == 1]
-    #tn = [i for i in y_pred if y_pred[i] == 0 and y_true[i] == 0]
 
     tp = 0
     fp = 0
@@ -591,11 +634,16 @@ for t in thresholds:
     print((fpr, tpr))
     fp_tp_pairs.append((fpr, tpr))
 
+    print("Current threshold: ", t)
+    print("tp, fp, fn, tn")
+    print(tp_tot, fp_tot, fn_tot, tn_tot)
+
     # save this fpr and tpr pair corresponding threshold value
     # do this for reverse lookup table to pick a specific threshold from TPR, FPR vals
 
     reverse_lookup[t] = (fpr, tpr)
 
+print("total")
 print("tp, fp, fn, tn")
 print(tp_tot, fp_tot, fn_tot, tn_tot)
 
@@ -642,14 +690,6 @@ pdb.set_trace()
 Now, if we want to choose a specific point on the curve,
 just re-run a new trial using that threshold (access TPR and FPR based on reverse_lookup)
 """
-
-# pdb.set_trace()
-#print("sims so far")
-#print(sims)
-#pdb.set_trace()
-#games = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, loop_offset=offset)
-#games_dict = games[0]
-#offset = games[1]
 
 end_time = time.time() - start_time
 # print("seconds: ", end_time)
