@@ -23,6 +23,9 @@ from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
 import numpy as np
 
+import pandas as pd
+
+
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import sklearn.metrics as metrics
 
@@ -42,27 +45,32 @@ HEADERS = {'User-Agent': 'Video Game Recommender Comprehensive Project'}
 GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 
 # input game X
-# QUERY = "klonoa door to phantomile"
-# QUERY = "super mario rpg"
-#QUERY = "vampire the masquerade"
-#QUERY = "sid meier civilization"
-#QUERY = "ultima"
-#QUERY = "team fortress 2"
-#QUERY = "final fantasy"
-#QUERY = "baldur's gate"
-#QUERY = "super mario bros"
-#QUERY = "pokemon red"
+# https://www.kaggle.com/datasets/dahlia25/metacritic-video-game-comments - use metacritic_game_info.csv to parse
 
-# TODO automate some games - try to get several games from dataset automatically rather than handpicked
-# maybe get game titles from csv? or API? either way try to automate instead of handpicking
-# https://www.kaggle.com/datasets/rush4ratio/video-game-sales-with-ratings ???
+# sample games from metacritic_game_info.csv before automating with API
 
-QUERY_GAMES = ["fez", "limbo","red dead redemption", "witcher 2", "zelda wind waker", "kerbal space program",
+#pdb.set_trace()
+
+csv_titles_df = pd.read_csv("flask/metacritic_game_info.csv")
+#for t in csv_titles_df:
+ #   print(t)
+  #  pdb.set_trace()
+
+#pdb.set_trace()
+
+QUERY_GAMES = list(set([i for i in csv_titles_df['Title']][0:94])) # 70 games
+
+QUERY_GAMES += ["fez", "limbo","red dead redemption", "witcher 2", "faster than light", "kerbal space program",
               "sonic the hedgehog", "faster than light", "oregon trail", "thomas was alone", "jet set radio",
               "the legend of zelda", "space invaders", "klonoa door to phantomile", "super mario bros", "pokemon red", "baldur's gate", "team fortress 2", "vampire the masquerade",
               "super mario rpg", "ultima", "worms 2", "pacman", "galaga", "space invaders", 
               "mario kart", "castlevania symphony of the night", "donkey kong country",
-              "command and conquer", "civilization 5", "metal gear solid"]
+              "command and conquer", "civilization 5", "metal gear solid", "prey", "uncharted 2"]
+print(len(QUERY_GAMES)) # 101 games
+
+QUERY_GAMES = list(set(QUERY_GAMES))
+
+pdb.set_trace()
 
 games_used = 0
 
@@ -78,8 +86,15 @@ total_reverse_lookup = []
 total_tpr_lookup = []
 total_fpr_lookup = []
 
+
+sims_len_values = []
 sims_total_values = []
+sims_changes = []
 total_cosine_sims = []
+total_changes = []
+
+total_game_dict_lens = []
+total_game_dict_item_lens = []
 
 # 1. Imports and setup to get reviews from API
 """
@@ -211,34 +226,17 @@ for QUERY in QUERY_GAMES:
             game_results = search_json['results'][i]
             game_not_found = False
 
-
     if game_results == None:
         print("Input query game not found in API database")
         continue
 
     #pdb.set_trace()
-
-
     query_name = game_results['name']
     game_deck = game_results['deck']
     game_desc = game_results['description']
     game_platforms = game_results['platforms']
-
     #pdb.set_trace()
-
     GUID = game_results['guid']
-
-    #pdb.set_trace()
-
-    # try to get GameSpot review for query game
-
-    #query_rev_url = "http://www.gamespot.com/api/games/?api_key=" + GAMESPOT_API_KEY + \
-    #   "&format=json&filter=name:" + query_name
-    #query_rev_call = session.get(query_rev_url, headers=HEADERS) 
-    #query_json = json.loads(query_rev_call.text)['results']
-
-    #print("check query review GameSpot")
-    #pdb.set_trace()
 
     tokenizer = RegexpTokenizer(r'\w+')
     stops = set(stopwords.words("english"))
@@ -254,7 +252,6 @@ for QUERY in QUERY_GAMES:
                 platform_list.append(v)
 
     # pdb.set_trace()
-
     # get aspects of GUID - genres, themes, franchises
 
     game_api_url = "https://www.giantbomb.com/api/game/" + \
@@ -268,6 +265,7 @@ for QUERY in QUERY_GAMES:
     print("game_api_results")
     #pdb.set_trace()
 
+    # set unexpected input to empty string, and manually set cosine similarity to 0 later to account for it
     if 'genres' in game_api_results and game_api_results['genres'] != None:
         try:
             query_genre = game_api_results['genres'][0]['name']
@@ -299,9 +297,6 @@ for QUERY in QUERY_GAMES:
 
     sample_similar_games = []
     game_count = 5
-    #similar_threshold = 5
-    #similar_threshold = len(similar_games_to_query) #min(len(similar_games_to_query), 5)
-
     similar_found = True
 
     if similar_games_to_query == None:
@@ -318,15 +313,8 @@ for QUERY in QUERY_GAMES:
         # use api_detail_url in similar_games[i] to call game API on each similar game
         # then, store genres, franchises etc
         # append dict to games_dict
-        # we have GUID from 
         print("similar games set trace")
         # pdb.set_trace()
-
-        # get ground truth games to avoid division by zero error
-        # proof of concept - get 3, or as many as there are, whichever is less
-        # get all info about these games and add them to games_dict to ensure presence of ground truth
-
-        # do proof of concept
 
         if len(sample_similar_games) == 0 or similar_found == False:
             print("no similar games found")
@@ -363,18 +351,14 @@ for QUERY in QUERY_GAMES:
         continue 
 
     for sg in sample_similar_games:
+        
         for k, v in sg.items(): # key = name and value = GUID
             # https://www.giantbomb.com/api/documentation/#toc-0-17
             search_sample_url = "https://www.giantbomb.com/api/game/" + \
                 v + "/?api_key=" + GIANTBOMB_API_KEY + \
                 "&format=json"
+            
             sample_resp = session.get(search_sample_url, headers=HEADERS)
-            # pdb.set_trace()
-
-            # search_json = json.loads(search_game_resp.text)
-            #print("check json response text")
-            # pdb.set_trace()
-
             if sample_resp == None or sample_resp.text == None:
                 continue
 
@@ -385,7 +369,11 @@ for QUERY in QUERY_GAMES:
             # pdb.set_trace()
 
             for i in range(min(len(sample_results), 1)):
-                name = sample_results['name']
+
+                if sample_results['name'] != None:
+                    name = sample_results['name']
+                else:
+                    name = ''
 
                 if sample_results['deck'] != None:
                     deck = sample_results['deck']
@@ -419,13 +407,14 @@ for QUERY in QUERY_GAMES:
                             'review': None,
                             'recommended': 1} # used in y_true
 
-    genre_list = get_game_demographics(game_api_json, 'genres')
-    theme_list = get_game_demographics(game_api_json, 'themes')
-    franchise_list = get_game_demographics(game_api_json, 'franchises')
-
-    #pdb.set_trace()
-
-    #pdb.set_trace()
+    if 'results' in game_api_json.keys():
+        genre_list = get_game_demographics(game_api_json, 'genres')
+        theme_list = get_game_demographics(game_api_json, 'themes')
+        franchise_list = get_game_demographics(game_api_json, 'franchises')
+    else:
+        genre_list = ['']
+        theme_list = ['']
+        franchise_list = ['']
 
     query_dict = {}
     query_dict[query_name] = {'name': query_name,
@@ -436,27 +425,25 @@ for QUERY in QUERY_GAMES:
                             'franchises': franchise_list,
                             'themes': theme_list}
 
-    print("check ground truth games & dataset games")
-    # pdb.set_trace()
-
-    # games_test_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=20)
-    #pdb.set_trace()
-
+    #print("check ground truth games & dataset games")
     """
-    2. Perform word embedding step
+    2. Perform recommendation step
     Use a pretrained model
     Compare game X to every game in the dataset
     If the cosine similarity is greater than the threshold, return the game
     """
 
     #pdb.set_trace()
-
     sims = {}
     fpr_list = []
     tpr_list = []
 
     # put similar_games GiantBomb API results into dataset games from GameSpot API
     total_games_dict = {** dataset_games_dict, ** similar_games_dict}
+
+    print(len(total_games_dict))
+    total_game_dict_lens.append(len(total_games_dict))
+    total_game_dict_item_lens.append(len(total_games_dict.items()))
 
     # randomly shuffle dictionary keys to mix ground truth games with games_dict
     # https://stackoverflow.com/questions/19895028/randomly-shuffling-a-dictionary-in-python
@@ -465,23 +452,8 @@ for QUERY in QUERY_GAMES:
     total_games_dict = dict(temp_list)
 
     #pdb.set_trace()
-
     y_true = [v['recommended'] for k, v in total_games_dict.items()]
 
-
-    print("fix games_dict shuffle")
-    #pdb.set_trace()
-
-        # games_dict = get_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=30, loop_offset=0 + 2 * i)
-
-        # https://radimrehurek.com/gensim/models/keyedvectors.html
-        # https://radimrehurek.com/gensim/auto_examples/tutorials/run_wmd.html
-
-        # query_dict: query name, deck, description
-        # go through each game in list and see which is best
-
-    # Can't use ground truth inside algorithm guts. Instead, 
-    # use definition of ROC curve.
     """
     Start with thresholds - uniform list of floats
     0.1, 0.2, 0.3, ..., 0.9
@@ -507,12 +479,12 @@ for QUERY in QUERY_GAMES:
     }
 
     y_cos_sim = []
-
     # recommendation algorithm
-
     model_sim_threshold = 0.9
+
+    print(len(total_games_dict))
+
     for k, v in total_games_dict.items():
-        
         model_sim = 0
         no_nulls = True
 
@@ -529,7 +501,6 @@ for QUERY in QUERY_GAMES:
         min_desc_tokens = max(min_desc_tokens, 1)
 
         # if any attribute (deck, description, genre, theme, franchise) is null, don't recommend
-
         game_attributes = [v['name'], v['deck'], v['description'], v['genres'], v['themes'], v['franchises']]
 
         for g in game_attributes:
@@ -555,67 +526,40 @@ for QUERY in QUERY_GAMES:
 
         if no_nulls:
             for g in v['genres']:
-
                 if isinstance(g, str):
                     if query_genre == g and query_genre != '':
-
-                        #model_sim = model.n_similarity(query_desc_data, desc)
-                        #sims[k] = model_sim
-                        
                         model_sim = model.n_similarity(query_name, v['name'])
                         sims[k] = model_sim
                         reasons_dict['genre'] += 1
 
                 elif isinstance(g, dict):
                     if query_genre in g.values() and query_genre != '':
-                        
-                        #model_sim = model.n_similarity(query_desc_data, desc)
-                        #sims[k] = model_sim
-
                         model_sim = model.n_similarity(query_name, v['name'])
                         sims[k] = model_sim
                         reasons_dict['genre'] += 1
             
             for g in v['themes']:
-
                 if isinstance(g, str):
                     if query_theme == g and query_theme != '':
-
-                        #model_sim = model.n_similarity(query_desc_data, desc)
-                        #sims[k] = model_sim
-
                         model_sim = model.n_similarity(query_name, v['name'])
                         sims[k] = model_sim
                         reasons_dict['theme'] += 1
 
                 elif isinstance(g, dict):
                     if query_theme in g.values() and query_theme != '':
-                        
-                        #model_sim = model.n_similarity(query_desc_data, desc)
-                        #sims[k] = model_sim
-
                         model_sim = model.n_similarity(query_name, v['name'])
                         sims[k] = model_sim
                         reasons_dict['theme'] += 1
             
             for g in v['franchises']:
-
                 if isinstance(g, str):
                     if query_franchise == g and query_franchise != '':
-
-                        #model_sim = model.n_similarity(query_desc_data, desc)
-                        #sims[k] = model_sim
-                        
                         model_sim = model.n_similarity(query_name, v['name'])
                         sims[k] = model_sim
                         reasons_dict['franchise'] += 1
 
                 elif isinstance(g, dict):
                     if query_franchise in g.values() and query_franchise != '':
-                        
-                        #model_sim = model.n_similarity(query_desc_data, desc)
-                        #sims[k] = model_sim
-
                         model_sim = model.n_similarity(query_name, v['name'])
                         sims[k] = model_sim
                         reasons_dict['franchise'] += 1
@@ -626,6 +570,7 @@ for QUERY in QUERY_GAMES:
             y_cos_sim.append(0) # not recommending
 
         total_cosine_sims.append(model_sim)
+        total_changes += [len(total_cosine_sims)]
 
         # print(y_cos_sim)
                 
@@ -700,20 +645,32 @@ for QUERY in QUERY_GAMES:
         reverse_lookup[t] = (fpr, tpr, t)
         tpr_lookup[tpr] = {'fpr': fpr, 't': t}
         tpr_lookup[fpr] = {'tpr': tpr, 't': t}
-
-
     
     total_fprs_tprs.append(fp_tp_pairs)
     total_reverse_lookup.append(reverse_lookup)
     total_tpr_lookup.append(tpr_lookup)
     total_fpr_lookup.append(fpr_lookup)
+
+    sims_len_values.append(len(sims.values()))
     sims_total_values += [v for v in sims.values()]
+    sims_changes += [len(sims_total_values)]
+
+    print("sims_len_vlaues")
+    print(len(sims_len_values))
+
+    print("sims_total_values")
+    print(len(sims_total_values))
+
+    print("total_games_dict_lens")
+    print(total_game_dict_lens)
+
+    #print("total_game_dict_items_len")
+    #print(total_game_dict_item_lens)
 
     print("total")
     print("tp, fp, fn, tn")
     print(tp_tot, fp_tot, fn_tot, tn_tot)
 
-    #pdb.set_trace()
     print(reverse_lookup)
 
     fvals = []
@@ -724,7 +681,8 @@ for QUERY in QUERY_GAMES:
 
     lin_x = np.linspace(0.0, 1.0, 11)
     lin_y = np.linspace(0.0, 1.0, 11)
-
+    """
+    Uncomment to get individual plots
     #plt.plot(fvals, tvals)
     #plt.plot(lin_x, lin_y, label='linear')  # Plot some data on the (implicit) axes.
     #plt.xlabel("FPR")
@@ -732,7 +690,7 @@ for QUERY in QUERY_GAMES:
     #new_title = "ROC curve: " + QUERY
     #plt.title(new_title)
     #plt.show()
-
+    """
     print(fp_tp_pairs)
 
     print("sims")
@@ -751,17 +709,14 @@ for QUERY in QUERY_GAMES:
     print(y_pred[0:10])
     print("y_true")
     print(y_true[0:10])
-    #pdb.set_trace()
 
     """
     Now, if we want to choose a specific point on the curve,
     just re-run a new trial using that threshold (access TPR and FPR based on reverse_lookup)
     """
-
     games_used += 1
 
     end_time = time.time() - start_time
-    # print("seconds: ", end_time)
     print("minutes: ", end_time / 60)
 
 # take the average of several games ROC to see what it looks like
@@ -769,10 +724,6 @@ fvals = [0] * len(total_fprs_tprs[0])
 tvals = [0] * len(total_fprs_tprs[0])
 threshold_vals = [0] * len(total_fprs_tprs[0])
 
-"""
-0.1: (1.0, 0.96), 0.11: (1.0, 0.96),
-0.12: (1.0, 0.96), 0.13: (1.0, 0.96), 0.14: (1.0, 0.96), 0.15: (1.0, 0.96), 0.16: (1.0, 0.96), 0.17: (1.0, 0.96), 0.18: (1.0, 0.96), 0.19: (1.0, 0.96), 0.2: (1.0, 0.96), 0.21: (1.0, 0.96), 0.22: (1.0, 0.96), 0.23: (1.0, 0.96), 0.24: (1.0, 0.96), 0.25: (1.0, 0.96), 0.26: (1.0, 0.96), 0.27: (1.0, 0.96), 0.28: (1.0, 0.96), 0.29: (1.0, 0.96), 0.3: (1.0, 0.96), 0.31: (1.0, 0.96), 0.32: (1.0, 0.96), 0.33: (1.0, 0.96), 0.34: (1.0, 0.96), 0.35: (1.0, 0.96), 0.36: (1.0, 0.96), 0.37: (1.0, 0.96), 0.38: (1.0, 0.96), 0.39: (1.0, 0.96), 0.4: (1.0, 0.96), 0.41: (1.0, 0.96), 0.42: (1.0, 0.96), 0.43: (1.0, 0.96),
-"""
 print(total_fprs_tprs)
 
 pdb.set_trace()
@@ -780,13 +731,10 @@ pdb.set_trace()
 # sum all TPR and FPR values on a per game, per tuple basis
 for i in range(len(total_fprs_tprs)):
     for j in range(len(total_fprs_tprs[i])):
-        #print("j")
-        #pdb.set_trace()
         fvals[j] += total_fprs_tprs[i][j][0]
         tvals[j] += total_fprs_tprs[i][j][1]
         threshold_vals[j] += total_fprs_tprs[i][j][2]
         print("threshold ", total_fprs_tprs[i][j][0], total_fprs_tprs[i][j][1], total_fprs_tprs[i][j][2])
-        #pdb.set_trace()
 
 pdb.set_trace()
 
@@ -794,37 +742,6 @@ pdb.set_trace()
 avg_fvals = [fvals[j] / len(total_fprs_tprs) for j in range(len(fvals))]
 avg_tvals = [tvals[j] / len(total_fprs_tprs) for j in range(len(tvals))]
 avg_thresholds = [threshold_vals[j] / len(threshold_vals) for j in range(len(threshold_vals))]
-
-"""
-# also get the reverse lookup values to start finding performance jumps
-# check reverse value to see where "jumps" are
-print("check total_reverse_lookup")
-
-sum_lookup_fpr = [0] * len(total_reverse_lookup) * len(thresholds)
-sum_lookup_tpr = [0] * len(total_reverse_lookup) * len(thresholds)
-ct = 0
-for i in range(len(total_reverse_lookup)):
-    print("iteration " + str(i) + " belonging to " + QUERY_GAMES[i])
-
-    for t in thresholds:
-        print(i, total_reverse_lookup[i][t][0], total_reverse_lookup[i][t][1])
-        sum_lookup_fpr[ct] = total_reverse_lookup[i][t][0]
-        sum_lookup_tpr[ct] = total_reverse_lookup[i][t][1]
-        ct += 1
-
-#sum_lookup_fpr = sum_lookup_fpr / (len(total_reverse_lookup) * len(thresholds))
-#sum_lookup_tpr = sum_lookup_tpr / (len(total_reverse_lookup) * len(thresholds))
-#avg_fpr = 
-
-#avg_fpr = [sum_lookup_fpr[j] / (len(total_reverse_lookup) * len(thresholds)) for j in range(len(sum_lookup_fpr))]
-#avg_tpr = [sum_lookup_tpr[j] / (len(total_reverse_lookup) * len(thresholds)) for j in range(len(sum_lookup_tpr))]
-
-print("avg_fpr and tpr")
-for i in range(len(fvals)):
-    print(i, fvals[i], tvals[i])
-#print(avg_fpr)
-#print(avg_tpr)
-"""
 
 pdb.set_trace()
 
@@ -843,9 +760,6 @@ plt.show()
 print((time.time() - start_time) / 60)
 print("minutes")
 
-print("games_used")
-print(games_used)
-
 print("use total reverse lookup to check for unusual points")
 
 print("individual games")
@@ -858,45 +772,29 @@ pdb.set_trace()
 print("aggregated ROC points")
 for i in range(len(avg_fvals[::-1])):
     print(i, avg_fvals[::-1][i], avg_tvals[::-1][i], avg_thresholds[::-1][i]) # look up threshold from this ordered pair
-    #if avg_fvals[::-1][i] in total_fpr_lookup[i].keys():
-      #  print("f threshold: " + str(total_fpr_lookup[i][avg_fvals[::-1][i]]))
-    #i#f avg_tvals[::-1][i] in total_tpr_lookup[i].keys():
-     #   print("t threshold: " + str(total_tpr_lookup[i][avg_tvals[::-1][i]]))
 
-"""
-Try generating a plot of histograms
-Then research how using embeddings as entry to word encoder might help
-(Instead of feeding in raw plaintext strings)
-"""
+print("analyze histogram counts reason")
 
-print("check histograms")
+
+#print("check histograms")
+#pdb.set_trace()
+
+#plt.hist(sims_total_values, bins=100)
+#plt.title("total accepted rec cos sims") # 0.93 is max
+#plt.show()
+
+#plt.hist(total_cosine_sims, bins=100)
+#plt.title("total rec cos sims")
+#plt.show()
+
 pdb.set_trace()
 
-# plot histogram
-#counts, bins = np.histogram([v for k, v in sims.items()])
-#plt.stairs(counts, bins)
-#plt.show()
-
-#counts, bins = np.histogram(sims_total_values)
-#plt.stairs(counts, bins)
-#plt.show()
-
-plt.hist(sims_total_values, bins=100)
-plt.title("total accepted rec cos sims")
-plt.show()
-
-#counts, bins = np.histogram(total_cosine_sims)
-#plt.stairs(counts, bins)
-#plt.show()
-
-plt.hist(total_cosine_sims, bins=100)
-plt.title("total rec cos sims")
-plt.show()
-
-pdb.set_trace()
+print("games_used")
+print(games_used)
 
 print("end time: ")
 print(time.time() - start_time)
 
 print("final pdb")
 pdb.set_trace()
+
