@@ -2,6 +2,7 @@ import requests_cache
 import json
 from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
+import pdb
 
 my_session = requests_cache.CachedSession("my_new_cache")
 
@@ -28,14 +29,34 @@ def get_gamespot_game_info(api_key, headers, offset, session=my_session):
     game_call = session.get(game_url, headers=headers) 
     game_json = json.loads(game_call.text)['results']
 
+    # normalize qualities to get same data structure as GiantBomb games
+
     for game in game_json:
+
+        # pdb.set_trace()
+
+        if 'genres' in game.keys() and len(game['genres']) >= 1:
+            genre_list = normalize_qualities(game['genres'])
+        else:
+            genre_list = ['']
+
+        if 'themes' in game.keys() and len(game['themes']) >= 1:
+            theme_list = normalize_qualities(game['themes'])
+        else:
+            theme_list = ['']
+
+        if 'franchises' in game.keys() and len(game['franchises']) >= 1:
+            franchise_list = normalize_qualities(game['franchises'])
+        else:
+            franchise_list = ['']
+
         game_data[game['name']] = {'id': game['id'], 
                             'name': game['name'],
                             'deck': game['deck'],
                             'description': game['description'], 
-                            'genres': game['genres'], 
-                            'themes': game['themes'], 
-                            'franchises': game['franchises'], 
+                            'genres': genre_list, 
+                            'themes': theme_list, 
+                            'franchises': franchise_list, 
                             'recommended' : 0} # used in y_true
     return game_data
 
@@ -90,6 +111,31 @@ def get_game_demographics(json_file, dict_key):
             call_list.append(call[i]['name'])
 
         return call_list
+
+"""
+normalize_qualities
+Normalize genres, themes, and franchises to all be of format [''] or contain content
+Can take GiantBomb or GameSpot API
+Arguments:
+    quality (list): genres, themes, franchises, etc.
+Returns:
+    quality_list (list): a list of qualities, each of format [''] so that string entries are filtered out
+"""
+def normalize_qualities(quality):
+    q_list = []
+    if isinstance(quality, str): # giantbomb
+        q_list.append(quality)
+    elif isinstance(quality, list) and quality[0] and isinstance(quality[0], dict): # gamespot
+        for qi in range(len(quality)):
+            for k, v in quality[qi].items():
+                q_list.append(v)
+    elif isinstance(quality, list) and not quality[0]: # gamespot
+        q_list.append([''])
+    elif isinstance(quality, list): # giantbomb
+        q_list += quality
+    else:
+        q_list.append([''])
+    return q_list
 
 """
 get_giantbomb_game_info
@@ -155,27 +201,27 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
     # set unexpected input to empty string, and manually set cosine similarity to 0 later to account for it
     if 'genres' in game_api_results and game_api_results['genres'] != None:
         try:
-            query_genre = game_api_results['genres'][0]['name']
+            query_genre = normalize_qualities(game_api_results['genres'][0]['name'])
         except TypeError:
-            query_genre = ''
+            query_genre = ['']
     else:
-        query_genre = ''
+        query_genre = ['']
     
     if 'themes' in game_api_results and game_api_results['themes'] != None:
         try:
-            query_theme = game_api_results['themes'][0]['name']
+            query_theme = normalize_qualities(game_api_results['themes'][0]['name'])
         except TypeError:
-            query_theme = ''
+            query_theme = ['']
     else:
-        query_theme = ''
+        query_theme = ['']
 
     if 'franchises' in game_api_results and game_api_results['franchises'] != None:
         try:
-            query_franchise = game_api_results['franchises'][0]['name']
+            query_franchise = normalize_qualities(game_api_results['franchises'][0]['name'])
         except TypeError:
-            query_franchise = ''
+            query_franchise = ['']
     else:
-        query_franchise = ''
+        query_franchise = ['']
 
     # develop game dict to return
     query_game_dict = {}
@@ -186,7 +232,8 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         'genres': query_genre, 
         'themes': query_theme, 
         'franchises': query_franchise, 
-        'recommended': 0
+        'recommended': 0,
+      #  'similar_games': [] # similar games go inside game title column instead
     }
 
     # find similar games
@@ -194,9 +241,7 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
     sample_similar_games = []
 
     if similar_games_to_query == None:
-        query_game_dict['similar_games'] = []
         return query_game_dict # return since there are no games
-
     else:
         for i in range(len(similar_games_to_query)):
             name = similar_games_to_query[i]['name']
@@ -241,6 +286,14 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
                 genre_list = get_game_demographics(sample_json, 'genres')
                 theme_list = get_game_demographics(sample_json, 'themes')
                 franchise_list = get_game_demographics(sample_json, 'franchises')
+
+                #print("check lists")
+                #pdb.set_trace()
+
+                # normalize by making all empty entries of format ['']
+                #genres = normalize_qualities(genre_list)
+                #franchises = normalize_qualities(franchise_list)
+                #themes = normalize_qualities(theme_list)
 
                 query_game_dict[name] = {'name': name,
                             'deck': deck,
