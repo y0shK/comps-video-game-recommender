@@ -103,7 +103,6 @@ Returns:
     result (dict): {k: game name, v: {game properties, similar_games, recommend_boolean}}
 """
 def get_giantbomb_game_info(api_key, query, headers, session=my_session):
-
     # https://www.giantbomb.com/api/documentation/#toc-0-17
     search_api_url = "https://www.giantbomb.com/api/search/?api_key=" + api_key + \
         "&format=json&query=" + query + \
@@ -142,7 +141,7 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
     name = game_results['name']
     deck = game_results['deck']
     desc = game_results['description']
-    platforms = game_results['platforms']
+    #platforms = game_results['platforms']
     GUID = game_results['guid']
 
     # get aspects of GUID - genres, themes, franchises
@@ -179,6 +178,7 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         query_franchise = ''
 
     # develop game dict to return
+    query_game_dict = {}
     query_game_dict[name] = { 
         'name': name,
         'deck': deck,
@@ -190,32 +190,64 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
     }
 
     # find similar games
-    # FIXME get csv titles and gamespot titles
-    # still have 1 big dataset
-    # csv titles will be rec Yes
-    # gamespot titles will be rec No
-    #
     similar_games_to_query = game_api_json['results']['similar_games']
-
     sample_similar_games = []
-    similar_found = True
 
     if similar_games_to_query == None:
-        sample_similar_games = []
-        similar_found = False
+        query_game_dict['similar_games'] = []
+        return query_game_dict # return since there are no games
+
     else:
         for i in range(len(similar_games_to_query)):
             name = similar_games_to_query[i]['name']
-            guid_val = similar_games_to_query[i]['api_detail_url'][35:-1] # check pdb for confirmation
+            guid_val = similar_games_to_query[i]['api_detail_url'][35:-1]
             sample_similar_games.append({name: guid_val})
 
-        if len(sample_similar_games) == 0 or similar_found == False:
-            sample_similar_games = []
+    # go through similar games to add them to dataset
+    for sg in sample_similar_games:
+        for k, v in sg.items():
+            # call API to get information for game
 
-    if len(sample_similar_games == 0):
-        query_game_dict['similar_games'] = []
-    else:
-        # FIXME get similar game entries from API call
-        pass
+            # append information to dictionary
+            # add to dataset such that game ought to be recommended (boolean == 1)
 
+            search_sample_url = "https://www.giantbomb.com/api/game/" + \
+                v + "/?api_key=" + api_key + \
+                "&format=json"
+            
+            sample_resp = session.get(search_sample_url, headers=headers)
+            if sample_resp == None or sample_resp.text == None:
+                continue
+
+            sample_json = json.loads(sample_resp.text)
+            sample_results = sample_json['results']
+
+            for i in range(min(len(sample_results), 1)):
+                if sample_results['name'] != None:
+                    name = sample_results['name']
+                else:
+                    name = ''
+
+                if sample_results['deck'] != None:
+                    deck = sample_results['deck']
+                else:
+                    deck = ''
+
+                if sample_results['description'] != None:
+                    desc = sample_results['description']
+                else:
+                    desc = ''
+
+                genre_list = get_game_demographics(sample_json, 'genres')
+                theme_list = get_game_demographics(sample_json, 'themes')
+                franchise_list = get_game_demographics(sample_json, 'franchises')
+
+                query_game_dict[name] = {'name': name,
+                            'deck': deck,
+                            'description': desc,
+                            'genres': genre_list,
+                            'franchises': franchise_list,
+                            'themes': theme_list,
+                            'recommended': 1} # used in y_true. Only the similar games are recommended
+    return query_game_dict
                 
