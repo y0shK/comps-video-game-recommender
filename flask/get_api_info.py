@@ -190,6 +190,12 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
     #platforms = game_results['platforms']
     GUID = game_results['guid']
 
+    # preprocess deck and description
+    if deck == None:
+        deck = ''
+    if desc == None:
+        desc = None 
+
     # get aspects of GUID - genres, themes, franchises
     game_api_url = "https://www.giantbomb.com/api/game/" + \
     GUID + "/?api_key=" + api_key + \
@@ -233,12 +239,15 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         'themes': query_theme, 
         'franchises': query_franchise, 
         'recommended': 0,
+        'recommended_from': ''
       #  'similar_games': [] # similar games go inside game title column instead
     }
 
     # find similar games
     similar_games_to_query = game_api_json['results']['similar_games']
     sample_similar_games = []
+
+    query_name = name
 
     if similar_games_to_query == None:
         return query_game_dict # return since there are no games
@@ -301,6 +310,7 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
                             'genres': genre_list,
                             'franchises': franchise_list,
                             'themes': theme_list,
-                            'recommended': 1} # used in y_true. Only the similar games are recommended
+                            'recommended': 1,
+                            'recommended_from': query_name} # used in y_true. Only the similar games are recommended
     return query_game_dict
                 
