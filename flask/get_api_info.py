@@ -19,22 +19,21 @@ Arguments:
     offset (int): how many pages API should skip before sending new content in response
     session (CachedSession): optional session to store results in local cache
 Returns: game_data (dict): key=name and value=
-    id, name, deck, description, genres, themes, franchises, recommend_boolean
+    id, name, deck, description, genres, themes, franchises, recommend_boolean == 0
 """
 def get_gamespot_game_info(api_key, headers, offset, session=my_session):
-
     game_data = {}
     game_url = "http://www.gamespot.com/api/games/?api_key=" + api_key + "&format=json" + \
         "&offset=" + str(offset)
     game_call = session.get(game_url, headers=headers) 
-    game_json = json.loads(game_call.text)['results']
+
+    try:
+        game_json = json.loads(game_call.text)['results']
+    except ValueError:
+        return {}
 
     # normalize qualities to get same data structure as GiantBomb games
-
     for game in game_json:
-
-        # pdb.set_trace()
-
         if 'genres' in game.keys() and len(game['genres']) >= 1:
             genre_list = normalize_qualities(game['genres'])
         else:
@@ -68,14 +67,14 @@ Arguments:
     headers (string): specify User-Agent field
     game_count (int): how many pages desired (roughly 100 games per page)
 Returns:
-    games (dict): {k: game name, v: {game properties, recommend_boolean}}
+    games (dict): {k: game name, v: {game properties, recommend_boolean == 0}}
 """
-def get_gamespot_games(api_key, headers, game_count=10):
+def get_gamespot_games(api_key, headers, game_count=10, session=my_session):
     # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
     games = {}
     for i in range(game_count):
         new_offset = i*99
-        new_games = get_gamespot_game_info(api_key=api_key, headers=headers, offset=new_offset)
+        new_games = get_gamespot_game_info(api_key=api_key, headers=headers, offset=new_offset, session=session)
         games = {**games, **new_games} 
     return games
 
@@ -139,14 +138,14 @@ def normalize_qualities(quality):
 
 """
 get_giantbomb_game_info
-Get information from GiantBomb API for a given query game
+Get information from GiantBomb API for a given query game (e.g., coming from the csv read-in)
 Arguments:
     api_key (string): API key for GameSpot
     query (string): query to search within API call
     headers (string): specify User-Agent field
     session (CachedSession): optional session to store results in local cache
 Returns: 
-    result (dict): {k: game name, v: {game properties, similar_games, recommend_boolean}}
+    result (dict): {k: game name, v: {game properties, recommend_boolean == 0}}
 """
 def get_giantbomb_game_info(api_key, query, headers, session=my_session):
     # https://www.giantbomb.com/api/documentation/#toc-0-17
@@ -157,7 +156,10 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         # resources = game details that should inform the results, while resource_type = game recommendation itself
     search_game_resp = session.get(search_api_url, headers=headers)
 
-    search_json = json.loads(search_game_resp.text)
+    try:
+        search_json = json.loads(search_game_resp.text)
+    except ValueError:
+        return {}
     game_results = None
 
     num_results = search_json['number_of_page_results']
@@ -171,8 +173,7 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         'genres': '', 
         'themes': '', 
         'franchises': '', 
-        'recommended' : 0,
-        'similar_games': []
+        'recommended' : 0
     }}
 
     for i in range(min(num_results, 5)):
@@ -187,7 +188,6 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
     name = game_results['name']
     deck = game_results['deck']
     desc = game_results['description']
-    #platforms = game_results['platforms']
     GUID = game_results['guid']
 
     # preprocess deck and description
@@ -201,7 +201,11 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
     GUID + "/?api_key=" + api_key + \
         "&format=json"
     game_api_resp = session.get(game_api_url, headers=headers)
-    game_api_json = json.loads(game_api_resp.text)
+
+    try:
+        game_api_json = json.loads(game_api_resp.text)
+    except ValueError:
+        return {}
     game_api_results = game_api_json['results']
 
     # set unexpected input to empty string, and manually set cosine similarity to 0 later to account for it
@@ -238,30 +242,106 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         'genres': query_genre, 
         'themes': query_theme, 
         'franchises': query_franchise, 
-        'recommended': 0,
-        'recommended_from': ''
-      #  'similar_games': [] # similar games go inside game title column instead
+        'recommended': 0
     }
 
-    # find similar games
-    similar_games_to_query = game_api_json['results']['similar_games']
-    sample_similar_games = []
+    return query_game_dict
 
-    query_name = name
+"""
+get_similar_games
+Given an input query game g (coming from csv or GameSpot), 
+give the recommended games for g (as determined by GiantBomb API)
+Arguments:
+    api_key (string): API key for GameSpot
+    query (string): query to search within API call
+    headers (string): specify User-Agent field
+    session (CachedSession): optional session to store results in local cache
+Returns:
+    similar_games (dict): {k: game name, v: {game properties, recommend_boolean == 1}},
+    or return {} in null case
+"""
+def get_similar_games(api_key, query, headers, session=my_session):
+
+    # search to get api response for given query
+    # if not found, return {}
+    # else, get the similar games for the query game
+    # then get a dictionary with all of their properties
+    # return that dictionary
+
+    # get api response for given query
+    search_api_url = "https://www.giantbomb.com/api/search/?api_key=" + api_key + \
+        "&format=json&query=" + query + \
+        "&resources=game" + \
+        "&resource_type=game" 
+    search_game_resp = session.get(search_api_url, headers=headers)
+
+    if search_game_resp == None or search_game_resp == '':
+        return {}
+
+    # https://stackoverflow.com/questions/62609264/how-to-catch-json-decoder-jsondecodeerror
+    try:
+        search_json = json.loads(search_game_resp.text)
+    except ValueError:
+        return {}
+    game_results = None
+
+    num_results = search_json['number_of_page_results']
+    game_not_found = True
+
+    dummy_game = {'': {
+        'id': '', 
+        'name': '',
+        'deck': '',
+        'description': '', 
+        'genres': '', 
+        'themes': '', 
+        'franchises': '', 
+        'recommended' : 0
+    }}
+
+    # return dummy game if no such query is found
+    for i in range(min(num_results, 5)):
+        if search_json['results'][i]['deck'] != None and search_json['results'][i]['description'] != None \
+        and game_not_found:
+            game_results = search_json['results'][i]
+            game_not_found = False
+
+    if game_results == None or game_not_found:
+        #return dummy_game
+        return {}
+    
+    # else, get all the similar games for the given query
+    # first get the game object itself
+    GUID = game_results['guid']
+    game_api_url = "https://www.giantbomb.com/api/game/" + \
+    GUID + "/?api_key=" + api_key + \
+        "&format=json"
+    game_api_resp = session.get(game_api_url, headers=headers)
+
+    try:
+        game_api_json = json.loads(game_api_resp.text)
+    except ValueError:
+        return {}
+
+    game_api_results = game_api_json['results']
+
+    # then find similar games using the game object results
+    similar_games_to_query = game_api_results['similar_games']
+    similar_games_list = []
 
     if similar_games_to_query == None:
-        return query_game_dict # return since there are no games
-    else:
-        for i in range(len(similar_games_to_query)):
-            name = similar_games_to_query[i]['name']
-            guid_val = similar_games_to_query[i]['api_detail_url'][35:-1]
-            sample_similar_games.append({name: guid_val})
+        #return dummy_game # no similar games worth noting
+        return {}
+    
+    for i in range(len(similar_games_to_query)):
+        name = similar_games_to_query[i]['name']
+        guid_val = similar_games_to_query[i]['api_detail_url'][35:-1]
+        similar_games_list.append({name: guid_val})
 
-    # go through similar games to add them to dataset
-    for sg in sample_similar_games:
+    similar_games_output = {}
+    for sg in similar_games_list:
         for k, v in sg.items():
             # call API to get information for game
-
             # append information to dictionary
             # add to dataset such that game ought to be recommended (boolean == 1)
 
@@ -270,11 +350,17 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
                 "&format=json"
             
             sample_resp = session.get(search_sample_url, headers=headers)
-            if sample_resp == None or sample_resp.text == None:
+            if sample_resp == None or sample_resp.text == None or sample_resp.text == "":
                 continue
 
-            sample_json = json.loads(sample_resp.text)
-            sample_results = sample_json['results']
+            if sample_resp.text != None:
+                try:
+                    sample_json = json.loads(sample_resp.text)
+                    sample_results = sample_json['results']
+                except ValueError:
+                    continue
+            else:
+                continue
 
             for i in range(min(len(sample_results), 1)):
                 if sample_results['name'] != None:
@@ -296,21 +382,11 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
                 theme_list = get_game_demographics(sample_json, 'themes')
                 franchise_list = get_game_demographics(sample_json, 'franchises')
 
-                #print("check lists")
-                #pdb.set_trace()
-
-                # normalize by making all empty entries of format ['']
-                #genres = normalize_qualities(genre_list)
-                #franchises = normalize_qualities(franchise_list)
-                #themes = normalize_qualities(theme_list)
-
-                query_game_dict[name] = {'name': name,
+                similar_games_output[name] = {'name': name,
                             'deck': deck,
                             'description': desc,
                             'genres': genre_list,
                             'franchises': franchise_list,
                             'themes': theme_list,
-                            'recommended': 1,
-                            'recommended_from': query_name} # used in y_true. Only the similar games are recommended
-    return query_game_dict
-                
+                            'recommended': 1}
+    return similar_games_output
