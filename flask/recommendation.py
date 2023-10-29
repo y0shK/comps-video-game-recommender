@@ -13,8 +13,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+import tensorflow as tf
+import tensorflow_hub as hub
+
 from get_api_info import get_giantbomb_game_info, get_gamespot_games, get_similar_games
-from process_recs import process_text, check_for_valid_qualities
+from process_recs import process_text, check_for_valid_qualities, get_embedding_similarity
 from calculate_metrics import calculate_confusion_matrix, calculate_average_pairs
 import gensim.downloader
 
@@ -71,7 +74,14 @@ Use a pretrained word2vec model to generate recommendations based on the current
 Then compare the predictions to the actual values and calculate TP, FP, FN, TN
 """
 # use a pretrained model
-model = gensim.downloader.load('glove-wiki-gigaword-50')
+#model = gensim.downloader.load('glove-wiki-gigaword-50')
+
+# set up tf universal encoder for cosine similarity comparisons on sentence embeddings
+module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
+model = hub.load(module_url)
+
+print(type(model))
+print("tf universal encoder set up!")
 
 # for next improvement to algorithm, try:
 # https://www.tensorflow.org/hub/tutorials/semantic_similarity_with_tf_hub_universal_encoder
@@ -88,8 +98,8 @@ stops = set(stopwords.words("english"))
 y_cos_sims = [] # becomes y_pred
 y_true = []
 
-model_sim_threshold = 0.9
-recs = {}
+model_sim_threshold = 0.75
+game_recs = {}
 total_pairs = []
 
 # determine why 0s are occurring
@@ -103,16 +113,25 @@ for k1, v1 in dataset.items():
     all_recs = {**dataset, **similar_games_instance}
     #print("all_recs len: ", len(all_recs))
 
+    print("dataset x all_recs")
+    print(len(dataset), len(all_recs))
+    print(len(dataset) * len(all_recs))
+
+    # if any attribute (deck, description, genre, theme, franchise) is invalid, don't recommend
+    valid1 = check_for_valid_qualities(v1['name'], v1['deck'], v1['description'],
+        v1['genres'], v1['themes'], v1['franchises'])
+    
+    if valid1:
+        v1_deck = process_text(v1['deck'])
+        v1_desc = process_text(v1['description'])
+
     for k2, v2 in all_recs.items():
         model_sim = 0
+        recs = {}
 
         # calculate y_true for metrics
         y_true.append(v2['recommended'])
         #print("len y_true", len(y_true))
-
-        # if any attribute (deck, description, genre, theme, franchise) is invalid, don't recommend
-        valid1 = check_for_valid_qualities(v1['name'], v1['deck'], v1['description'],
-                                          v1['genres'], v1['themes'], v1['franchises'])
         
         valid2 = check_for_valid_qualities(v2['name'], v2['deck'], v2['description'],
                                           v2['genres'], v2['themes'], v2['franchises'])
@@ -126,31 +145,31 @@ for k1, v1 in dataset.items():
             #print(len(y_cos_sims))
             continue
             
-        deck = process_text(v2['deck'])
-        desc = process_text(v2['description'])
+        v2_deck = process_text(v2['deck'])
+        v2_desc = process_text(v2['description'])
         
         # start recommendation process
-        model_sim = model.n_similarity(v1['deck'], v2['deck'])
+        model_sim = max(get_embedding_similarity(model, v1_deck, v2_deck), model_sim)
         if model_sim > model_sim_threshold:
             recs[k2] = model_sim
 
-        model_sim = model.n_similarity(v1['description'], v2['description'])
+        model_sim = max(get_embedding_similarity(model, v1_desc, v2_desc), model_sim)
         if model_sim > model_sim_threshold:
             recs[k2] = model_sim
 
         for g in v2['genres']:
             if g in v1['genres']:
-                model_sim = model.n_similarity(v1['name'], v2['name'])
+                model_sim = max(get_embedding_similarity(model, v1['genres'], v2['genres']), model_sim)
                 recs[k2] = model_sim
         
         for g in v2['themes']:
             if g in v1['themes']:
-                model_sim = model.n_similarity(v1['name'], v2['name'])
+                model_sim = max(get_embedding_similarity(model, v1['themes'], v2['themes']), model_sim)
                 recs[k2] = model_sim
         
         for g in v2['franchises']:
             if g in v1['franchises']:
-                model_sim = model.n_similarity(v1['name'], v2['name'])
+                model_sim = max(get_embedding_similarity(model, v1['franchises'], v2['franchises']), model_sim)
                 recs[k2] = model_sim
 
         if model_sim > 0:
@@ -159,22 +178,12 @@ for k1, v1 in dataset.items():
             y_cos_sims.append(0)
             cos_zero_dict['model_sim'] += 1
         
-        #print("on " + str(game_count) + " of " + str(len(all_recs.items())))
-        #game_count += 1
-        #print("Len of y_pred == len of y_true")
-        #print(len(y_cos_sims) == len(y_true))
+    game_recs[k1] = recs
     
     print("game: ", k1)
     print("on " + str(game_count) + " of " + str(len(dataset)))
     game_count += 1
     total_pairs += [calculate_confusion_matrix(y_cos_sims, thresholds, y_true)]
-    
-    #pdb.set_trace()
-    #print(y_cos_sims)
-    #print(len(y_cos_sims))
-    #print(recs)
-    #pdb.set_trace()
-    #total_pairs += calculate_confusion_matrix(y_cos_sims, thresholds, y_true)
 
 print("after for loop")
 pdb.set_trace()
@@ -182,8 +191,8 @@ pdb.set_trace()
 print("recs")
 print(recs)
 
-print("total_pairs")
-print(total_pairs)
+#print("total_pairs")
+#print(total_pairs)
 
 avg_pairs = calculate_average_pairs(total_pairs)
 avg_tvals = avg_pairs[0]
@@ -202,7 +211,7 @@ plt.title("ROC curve, averaged")
 plt.show()
 
 print("number of total cos sims entries:")
-print(len(y_cos_sims)) # 42762
+print(len(y_cos_sims))
 
 plt.hist(y_cos_sims)
 plt.show()
@@ -210,7 +219,7 @@ plt.show()
 nonzero_cos_sims = [i for i in y_cos_sims if i > 0]
 
 print("number of nonzero cos sims entries:")
-print(len(nonzero_cos_sims)) # 4076
+print(len(nonzero_cos_sims))
 
 print("max freq of nonzero cos sims")
 # https://stackoverflow.com/questions/10797819/finding-the-mode-of-a-list

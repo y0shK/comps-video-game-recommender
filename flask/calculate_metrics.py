@@ -62,7 +62,7 @@ def calculate_average_pairs(pairs):
             fvals[j] += total_fprs_tprs[i][j][0]
             tvals[j] += total_fprs_tprs[i][j][1]
             threshold_vals[j] += total_fprs_tprs[i][j][2]
-            print("threshold ", total_fprs_tprs[i][j][0], total_fprs_tprs[i][j][1], total_fprs_tprs[i][j][2])
+            #print("threshold ", total_fprs_tprs[i][j][0], total_fprs_tprs[i][j][1], total_fprs_tprs[i][j][2])
 
     # pdb.set_trace()
 
