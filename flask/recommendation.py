@@ -37,15 +37,16 @@ csv_titles_df = pd.read_csv("flask/metacritic_game_info.csv")
 1. form a dataset by combining games from metacritic csv and GameSpot API
 Get titles from each of the data sources, then get information from GiantBomb API call
 """
-csv_titles = list(set([i for i in csv_titles_df['Title']][0:3])) # 3 games
+#csv_titles = list(set([i for i in csv_titles_df['Title']][0:15])) # 10 games
+csv_titles = list(set([i for i in csv_titles_df['Title']][0:3]))
 print(csv_titles[0])
-#pdb.set_trace()
+pdb.set_trace()
 
 # check for get_similar_games appropriate data structure
-csv_zero = get_similar_games(api_key=GIANTBOMB_API_KEY, query=csv_titles[0], headers=HEADERS, session=session)
+#csv_zero = get_similar_games(api_key=GIANTBOMB_API_KEY, query=csv_titles[0], headers=HEADERS, session=session)
 #csv_zero = get_similar_games(api_key=GIANTBOMB_API_KEY, query="phoenix wright", headers=HEADERS, session=session)
-print("check if g dict shows up")
-pdb.set_trace()
+#print("check if g dict shows up")
+#pdb.set_trace()
 
 dataset = {}
 for title in csv_titles:
@@ -118,10 +119,10 @@ for k1, v1 in dataset.items():
     print(len(dataset) * len(all_recs))
 
     # if any attribute (deck, description, genre, theme, franchise) is invalid, don't recommend
-    valid1 = check_for_valid_qualities(v1['name'], v1['deck'], v1['description'],
+    vd1 = check_for_valid_qualities(v1['name'], v1['deck'], v1['description'],
         v1['genres'], v1['themes'], v1['franchises'])
     
-    if valid1:
+    if vd1['deck'] and vd1['description']:
         v1_deck = process_text(v1['deck'])
         v1_desc = process_text(v1['description'])
 
@@ -133,29 +134,31 @@ for k1, v1 in dataset.items():
         y_true.append(v2['recommended'])
         #print("len y_true", len(y_true))
         
-        valid2 = check_for_valid_qualities(v2['name'], v2['deck'], v2['description'],
+        vd2 = check_for_valid_qualities(v2['name'], v2['deck'], v2['description'],
                                           v2['genres'], v2['themes'], v2['franchises'])
         
-        valid = valid1 and valid2
+        valid = True in vd1.values() and True in vd2.values()
 
         if not valid:
-            y_cos_sims.append(0) # out of 42
+            y_cos_sims.append(0)
+            print("invalid rec")
             cos_zero_dict['invalid'] += 1
             #print("Len of y_cos_sims")
             #print(len(y_cos_sims))
             continue
-            
-        v2_deck = process_text(v2['deck'])
-        v2_desc = process_text(v2['description'])
         
         # start recommendation process
-        model_sim = max(get_embedding_similarity(model, v1_deck, v2_deck), model_sim)
-        if model_sim > model_sim_threshold:
-            recs[k2] = model_sim
+        if vd2['deck'] and vd2['description']:
+            v2_deck = process_text(v2['deck'])
+            v2_desc = process_text(v2['description'])
+        
+            model_sim = max(get_embedding_similarity(model, v1_deck, v2_deck), model_sim)
+            if model_sim > model_sim_threshold:
+                recs[k2] = model_sim
 
-        model_sim = max(get_embedding_similarity(model, v1_desc, v2_desc), model_sim)
-        if model_sim > model_sim_threshold:
-            recs[k2] = model_sim
+            model_sim = max(get_embedding_similarity(model, v1_desc, v2_desc), model_sim)
+            if model_sim > model_sim_threshold:
+                recs[k2] = model_sim
 
         for g in v2['genres']:
             if g in v1['genres']:

@@ -22,33 +22,41 @@ def process_text(game_text):
 
 """
 check_for_valid_qualities
-Take each piece of game information and determine if the given game from the dataset is a valid recommendation.
-Invalid recommendations are any that have incomplete information
+Take each piece of game information and determine if that piece of information is usable for recommendation.
+Invalid information is any quality that is null or empty
 Arguments: name, deck, desc (str)
         genres, themes, franchises (list of str)
-Returns: valid (boolean) determining if game is a possible recommendation
+Returns: valid_dict (dict) for all keys in arguments. 
+E.g., valid_dict['name'] : True if name is not null and not empty
 """
 def check_for_valid_qualities(name, deck, desc, genres, themes, franchises):
+    valid_dict = {'name': True,
+                  'deck': True,
+                  'description': True,
+                  'genres': True,
+                  'themes': True,
+                  'franchises': True}
+
     if name is None or name == "":
-        return False
+        valid_dict['name'] = False
     
     if deck is None or deck == "":
-        return False
+        valid_dict['deck'] = False
 
     if desc is None or desc == "":
-        return False
+        valid_dict['description'] = False
     
     # length 1 of genres, themes, franchises are OK, but no nulls or empty strings should be processed
     if genres is None or len(genres) < 1 or '' in genres:
-        return False
+        valid_dict['genre'] = False
     
     if themes is None or len(themes) < 1 or '' in themes:
-        return False
+        valid_dict['genre'] = False
     
     if franchises is None or len(franchises) < 1 or '' in franchises:
-        return False
+        valid_dict['genre'] = False
     
-    return True
+    return valid_dict
 
 """
 get_embedding_similarity
