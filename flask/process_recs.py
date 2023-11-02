@@ -6,6 +6,8 @@ from nltk.corpus import stopwords
 import tensorflow as tf
 from sklearn.metrics.pairwise import cosine_similarity
 
+import numpy as np
+
 tokenizer = RegexpTokenizer(r'\w+')
 stops = set(stopwords.words("english"))
 
@@ -80,3 +82,19 @@ def get_embedding_similarity(tfm, l1, l2):
 
     # cosine_similarity(norm1, norm2) returns [[float]]
     return abs(cosine_similarity(norm1, norm2)[0][0])
+
+"""
+get_embedding
+Given an instance of TensorFlow Universal Encoder model, 
+obtain numpy array value of (tokenized and preprocessed) sentence embedding
+Arguments: tfm (encoder model),
+            li (list of strings): tokenized string to embed
+Returns: np_embed (numpy array): word embedding in np.array form
+"""
+def get_embedding(tfm, li):
+    str1 = " ".join(li)
+    embed1 = tfm([str1])
+    norm1 = tf.nn.l2_normalize(embed1, axis=1)
+    np_embed = np.array(norm1[0])
+
+    return np_embed

@@ -38,7 +38,7 @@ csv_titles_df = pd.read_csv("flask/metacritic_game_info.csv")
 Get titles from each of the data sources, then get information from GiantBomb API call
 """
 #csv_titles = list(set([i for i in csv_titles_df['Title']][0:15])) # 10 games
-csv_titles = list(set([i for i in csv_titles_df['Title']][0:3]))
+csv_titles = list(set([i for i in csv_titles_df['Title']][0:1]))
 print(csv_titles[0])
 pdb.set_trace()
 
@@ -60,7 +60,7 @@ print("investigate dataset")
 #pdb.set_trace()
 
 # get gamespot games
-gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, session=session)
+gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=1, session=session)
 #print("look at gamespot games")
 #pdb.set_trace()
 
@@ -180,6 +180,12 @@ for k1, v1 in dataset.items():
         else:
             y_cos_sims.append(0)
             cos_zero_dict['model_sim'] += 1
+
+        #print("check y_pred (model_sim)")
+        #pdb.set_trace()
+
+        #print("check y_true (v2[recommended])")
+        #pdb.set_trace()
         
     game_recs[k1] = recs
     
@@ -187,6 +193,12 @@ for k1, v1 in dataset.items():
     print("on " + str(game_count) + " of " + str(len(dataset)))
     game_count += 1
     total_pairs += [calculate_confusion_matrix(y_cos_sims, thresholds, y_true)]
+
+    print("observe y_true and y_pred - test hypothesis")
+    pdb.set_trace()
+
+    print("backup pdb")
+    pdb.set_trace()
 
 print("after for loop")
 pdb.set_trace()
