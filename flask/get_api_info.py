@@ -255,12 +255,13 @@ Arguments:
     api_key (string): API key for GameSpot
     query (string): query to search within API call
     headers (string): specify User-Agent field
+    max_similar (int): optional argument to artificially cap similar game amount
     session (CachedSession): optional session to store results in local cache
 Returns:
     similar_games (dict): {k: game name, v: {game properties, recommend_boolean == 1}},
     or return {} in null case
 """
-def get_similar_games(api_key, query, headers, session=my_session):
+def get_similar_games(api_key, query, headers, max_similar=-1, session=my_session):
 
     # search to get api response for given query
     # if not found, return {}
@@ -333,7 +334,10 @@ def get_similar_games(api_key, query, headers, session=my_session):
         #return dummy_game # no similar games worth noting
         return {}
     
-    for i in range(len(similar_games_to_query)):
+    if max_similar == -1: # no user argument provided
+        max_similar = len(similar_games_to_query) # don't artificially cap
+
+    for i in range(min(len(similar_games_to_query), max_similar)):
         name = similar_games_to_query[i]['name']
         guid_val = similar_games_to_query[i]['api_detail_url'][35:-1]
         similar_games_list.append({name: guid_val})

@@ -23,6 +23,21 @@ def process_text(game_text):
     return tokenized_text
 
 """
+check_valid_deck_and_desc
+Check to make sure that string inputs to the word embeddings (deck and description) are valid.
+Invalid information is any quality that is null or empty
+Arguments: deck, desc (str)
+Returns: valid (boolean)
+"""
+def check_valid_deck_and_desc(deck, desc):
+    if deck == None or deck == '':
+        return False
+    if desc == None or desc == '':
+        return False
+    
+    return True
+
+"""
 check_for_valid_qualities
 Take each piece of game information and determine if that piece of information is usable for recommendation.
 Invalid information is any quality that is null or empty

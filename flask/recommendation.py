@@ -27,7 +27,6 @@ from mlxtend.plotting import plot_decision_regions
 
 from get_api_info import get_giantbomb_game_info, get_gamespot_games, get_similar_games
 from process_recs import process_text, check_for_valid_qualities, check_valid_deck_and_desc, get_embedding_similarity, get_embedding
-#from calculate_metrics import calculate_confusion_matrix, calculate_average_pairs
 
 start_time = time.time()
 load_dotenv()
@@ -42,69 +41,45 @@ GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 csv_titles_df = pd.read_csv("flask/metacritic_game_info.csv")
 
 """
-1a. form a dataset by combining games from metacritic csv and GameSpot API (all recommendation boolean == 0)
+1. Form a query set by combining games from metacritic csv and GameSpot API (all recommendation boolean == 0)
 Get titles from each of the data sources, then get information from API calls
 """
-csv_titles = list(set([i for i in csv_titles_df['Title']][0:100])) # 10 games
+csv_titles = list(set([i for i in csv_titles_df['Title']][0:15]))
+#csv_titles = list(set([i for i in csv_titles_df['Title']][0:100])) # 10 games
 print(csv_titles[0])
 print(len(csv_titles))
 pdb.set_trace()
 
-dataset = {}
+query_set = {}
 for title in csv_titles:
     query_dict = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=title, headers=HEADERS,session=session)
-    dataset = {**dataset, **query_dict}
+    query_set = {**query_set, **query_dict}
 
 pdb.set_trace()
-
-#print(dataset)
-print("investigate dataset")
-#pdb.set_trace()
 
 # get gamespot games - (2 * 99) games before filtering
-gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=3, session=session)
+gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, session=session)
 
-dataset = {**dataset, **gamespot_games}
-print("make sure all csv + gamespot games are recommended==0")
-pdb.set_trace()
+query_set = {**query_set, **gamespot_games}
 
-"""
-1b. get similar_games depending on the dataset items (all recommendation boolean == 1)
-Iterate through the dataset and find similar games via API call, assuming they exist
 """
 similar_games_dict = {}
-for k1, v1 in dataset.items():
+for k, v in query_set.items():
+
     # FIXME remove max_similar later
-    similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k1, headers=HEADERS, max_similar=10, session=session)
+    similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k, headers=HEADERS, max_similar=10, session=session)
     if similar_games_instance == None or similar_games_instance == {}:
         continue
-    else:
-        similar_games_dict = {**similar_games_dict, **similar_games_instance}
 
-print("check similar_games")
-pdb.set_trace()
-
-print("check len dataset vs. len similar_games")
-pdb.set_trace()
+    for sk, sv in similar_games_instance.items():
+        
+    
+    
 
 """
-1c. combine recommendation boolean == 0 items (csv and gamespot) with boolean == 1 items (similar games)
-This forms the dataset of games which will be used for training the model
-"""
-dataset = {**dataset, **similar_games_dict}
-
-# randomly shuffle dictionary keys to mix ground truth games with games_dict
-# https://stackoverflow.com/questions/19895028/randomly-shuffling-a-dictionary-in-python
-temp_list = list(dataset.items())
-random.shuffle(temp_list)
-total_games_dict = dict(temp_list)
-
-print("check total_games")
-pdb.set_trace()
 
 """
-2. Generate a train and test set for the model using previous API calls (with recommendation boolean=0)
-and similar_games (recommendation_boolean=1) 
+2. Generate a train and test set for the model 
 """
 # set up tf universal encoder for cosine similarity comparisons on sentence embeddings
 module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
@@ -117,20 +92,50 @@ print("tf universal encoder set up!")
 X = []
 y = []
 
-for k, v in dataset.items():
-    deck = v['deck']
-    desc = v['description']
+for k, v in query_set.items():
 
-    if check_valid_deck_and_desc(deck, desc) == False:
+    # on a per game basis,
+    # check similar games (which are recommended == 1 contingent on the query set game)
+    # and check all other query set games (which are recommended == 0 since they are not similar)
+    similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k, headers=HEADERS, max_similar=10, session=session)
+    if similar_games_instance == None or similar_games_instance == {}:
         continue
+    
+    for sk, sv in similar_games_instance.items():
+        deck = sv['deck']
+        desc = sv['description']
 
-    tokenized_deck = process_text(deck)
-    tokenized_desc = process_text(desc)
-    tokenized_list = tokenized_deck + tokenized_desc
-    word_embedding = get_embedding(model, tokenized_list)
+        if check_valid_deck_and_desc(deck, desc) == False:
+            continue
 
-    X.append(word_embedding)
-    y.append(v['recommended'])
+        tokenized_deck = process_text(deck)
+        tokenized_desc = process_text(desc)
+        tokenized_list = tokenized_deck + tokenized_desc
+        word_embedding = get_embedding(model, tokenized_list)
+
+        X.append(word_embedding)
+        y.append(1)
+    
+    #not_similar_games_instance = [{k, v} for k, v in query_set.items() if k not in similar_games_instance.keys()]
+    #not_similar_games_instance = not_similar_games_instance[0]
+
+    for nk, nv in query_set.items():
+        if nk in similar_games_instance:
+            continue
+
+        deck = nv['deck']
+        desc = nv['description']
+
+        if check_valid_deck_and_desc(deck, desc) == False:
+            continue
+
+        tokenized_deck = process_text(deck)
+        tokenized_desc = process_text(desc)
+        tokenized_list = tokenized_deck + tokenized_desc
+        word_embedding = get_embedding(model, tokenized_list)
+
+        X.append(word_embedding)
+        y.append(0)
 
 print("check dataset X and y")
 pdb.set_trace()
@@ -143,6 +148,11 @@ X_test = np.array(X[split:])
 y_test = np.array(y[split:])
 
 print("check train/test split")
+pdb.set_trace()
+
+print("check if smote needed")
+print(y.count(0))
+print(y.count(1))
 pdb.set_trace()
 
 """
@@ -179,7 +189,8 @@ plot_decision_regions(np.array(X_lowdim), np.array(y), clf=clf, legend=2)
 
 # Adding axes annotations
 plt.xlabel('Word embedding')
-plt.title('SVM Visualization')
+plt.ylabel('Recommendation of game')
+plt.title('Support Vector Machine visualization')
 plt.show()
 
 print("check visualizations")
@@ -192,4 +203,5 @@ print("final time")
 finaltime = time.time() - start_time
 print("final time (min): ", finaltime/60)
 
-# FIXME fix data sparseness (try SMOTE)
+# FIXME remove artificial limit on similar_games
+# FIXME fix data sparseness (try SMOTE) if needed
