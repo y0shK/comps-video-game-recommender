@@ -9,17 +9,25 @@ from dotenv import load_dotenv
 import time
 from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
+import random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 import tensorflow as tf
 import tensorflow_hub as hub
+from sklearn.svm import SVC
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import f1_score
+from sklearn.metrics import RocCurveDisplay
+
+from sklearn.decomposition import PCA
+from mlxtend.plotting import plot_decision_regions
 
 from get_api_info import get_giantbomb_game_info, get_gamespot_games, get_similar_games
-from process_recs import process_text, check_for_valid_qualities, get_embedding_similarity
-from calculate_metrics import calculate_confusion_matrix, calculate_average_pairs
-import gensim.downloader
+from process_recs import process_text, check_for_valid_qualities, check_valid_deck_and_desc, get_embedding_similarity, get_embedding
+#from calculate_metrics import calculate_confusion_matrix, calculate_average_pairs
 
 start_time = time.time()
 load_dotenv()
@@ -34,19 +42,13 @@ GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 csv_titles_df = pd.read_csv("flask/metacritic_game_info.csv")
 
 """
-1. form a dataset by combining games from metacritic csv and GameSpot API
-Get titles from each of the data sources, then get information from GiantBomb API call
+1a. form a dataset by combining games from metacritic csv and GameSpot API (all recommendation boolean == 0)
+Get titles from each of the data sources, then get information from API calls
 """
-#csv_titles = list(set([i for i in csv_titles_df['Title']][0:15])) # 10 games
-csv_titles = list(set([i for i in csv_titles_df['Title']][0:1]))
+csv_titles = list(set([i for i in csv_titles_df['Title']][0:100])) # 10 games
 print(csv_titles[0])
+print(len(csv_titles))
 pdb.set_trace()
-
-# check for get_similar_games appropriate data structure
-#csv_zero = get_similar_games(api_key=GIANTBOMB_API_KEY, query=csv_titles[0], headers=HEADERS, session=session)
-#csv_zero = get_similar_games(api_key=GIANTBOMB_API_KEY, query="phoenix wright", headers=HEADERS, session=session)
-#print("check if g dict shows up")
-#pdb.set_trace()
 
 dataset = {}
 for title in csv_titles:
@@ -59,195 +61,135 @@ pdb.set_trace()
 print("investigate dataset")
 #pdb.set_trace()
 
-# get gamespot games
-gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=1, session=session)
-#print("look at gamespot games")
-#pdb.set_trace()
+# get gamespot games - (2 * 99) games before filtering
+gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=3, session=session)
 
 dataset = {**dataset, **gamespot_games}
-
 print("make sure all csv + gamespot games are recommended==0")
 pdb.set_trace()
 
 """
-2. Perform the recommendation step.
-Use a pretrained word2vec model to generate recommendations based on the current loop iteration
-Then compare the predictions to the actual values and calculate TP, FP, FN, TN
+1b. get similar_games depending on the dataset items (all recommendation boolean == 1)
+Iterate through the dataset and find similar games via API call, assuming they exist
 """
-# use a pretrained model
-#model = gensim.downloader.load('glove-wiki-gigaword-50')
+similar_games_dict = {}
+for k1, v1 in dataset.items():
+    # FIXME remove max_similar later
+    similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k1, headers=HEADERS, max_similar=10, session=session)
+    if similar_games_instance == None or similar_games_instance == {}:
+        continue
+    else:
+        similar_games_dict = {**similar_games_dict, **similar_games_instance}
 
+print("check similar_games")
+pdb.set_trace()
+
+print("check len dataset vs. len similar_games")
+pdb.set_trace()
+
+"""
+1c. combine recommendation boolean == 0 items (csv and gamespot) with boolean == 1 items (similar games)
+This forms the dataset of games which will be used for training the model
+"""
+dataset = {**dataset, **similar_games_dict}
+
+# randomly shuffle dictionary keys to mix ground truth games with games_dict
+# https://stackoverflow.com/questions/19895028/randomly-shuffling-a-dictionary-in-python
+temp_list = list(dataset.items())
+random.shuffle(temp_list)
+total_games_dict = dict(temp_list)
+
+print("check total_games")
+pdb.set_trace()
+
+"""
+2. Generate a train and test set for the model using previous API calls (with recommendation boolean=0)
+and similar_games (recommendation_boolean=1) 
+"""
 # set up tf universal encoder for cosine similarity comparisons on sentence embeddings
 module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
 model = hub.load(module_url)
-
 print(type(model))
 print("tf universal encoder set up!")
 
-# for next improvement to algorithm, try:
-# https://www.tensorflow.org/hub/tutorials/semantic_similarity_with_tf_hub_universal_encoder
-# https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/46808.pdf
+# X is a list of deck and description embeddings, as generated by encoder
+# y is the recommendation boolean
+X = []
+y = []
 
-# get thresholds
-thresholds = list(np.linspace(0.1, 1, 100))
-thresholds = [round(i, 2) for i in thresholds]
+for k, v in dataset.items():
+    deck = v['deck']
+    desc = v['description']
 
-tokenizer = RegexpTokenizer(r'\w+')
-stops = set(stopwords.words("english"))
+    if check_valid_deck_and_desc(deck, desc) == False:
+        continue
 
-# start algorithm
-y_cos_sims = [] # becomes y_pred
-y_true = []
+    tokenized_deck = process_text(deck)
+    tokenized_desc = process_text(desc)
+    tokenized_list = tokenized_deck + tokenized_desc
+    word_embedding = get_embedding(model, tokenized_list)
 
-model_sim_threshold = 0.75
-game_recs = {}
-total_pairs = []
+    X.append(word_embedding)
+    y.append(v['recommended'])
 
-# determine why 0s are occurring
-cos_zero_dict = {'invalid': 0,
-                 'model_sim': 0}
-
-game_count = 1
-
-for k1, v1 in dataset.items():
-    similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k1, headers=HEADERS, session=session)
-    all_recs = {**dataset, **similar_games_instance}
-    #print("all_recs len: ", len(all_recs))
-
-    print("dataset x all_recs")
-    print(len(dataset), len(all_recs))
-    print(len(dataset) * len(all_recs))
-
-    # if any attribute (deck, description, genre, theme, franchise) is invalid, don't recommend
-    vd1 = check_for_valid_qualities(v1['name'], v1['deck'], v1['description'],
-        v1['genres'], v1['themes'], v1['franchises'])
-    
-    if vd1['deck'] and vd1['description']:
-        v1_deck = process_text(v1['deck'])
-        v1_desc = process_text(v1['description'])
-
-    for k2, v2 in all_recs.items():
-        model_sim = 0
-        recs = {}
-
-        # calculate y_true for metrics
-        y_true.append(v2['recommended'])
-        #print("len y_true", len(y_true))
-        
-        vd2 = check_for_valid_qualities(v2['name'], v2['deck'], v2['description'],
-                                          v2['genres'], v2['themes'], v2['franchises'])
-        
-        valid = True in vd1.values() and True in vd2.values()
-
-        if not valid:
-            y_cos_sims.append(0)
-            print("invalid rec")
-            cos_zero_dict['invalid'] += 1
-            #print("Len of y_cos_sims")
-            #print(len(y_cos_sims))
-            continue
-        
-        # start recommendation process
-        if vd2['deck'] and vd2['description']:
-            v2_deck = process_text(v2['deck'])
-            v2_desc = process_text(v2['description'])
-        
-            model_sim = max(get_embedding_similarity(model, v1_deck, v2_deck), model_sim)
-            if model_sim > model_sim_threshold:
-                recs[k2] = model_sim
-
-            model_sim = max(get_embedding_similarity(model, v1_desc, v2_desc), model_sim)
-            if model_sim > model_sim_threshold:
-                recs[k2] = model_sim
-
-        for g in v2['genres']:
-            if g in v1['genres']:
-                model_sim = max(get_embedding_similarity(model, v1['genres'], v2['genres']), model_sim)
-                recs[k2] = model_sim
-        
-        for g in v2['themes']:
-            if g in v1['themes']:
-                model_sim = max(get_embedding_similarity(model, v1['themes'], v2['themes']), model_sim)
-                recs[k2] = model_sim
-        
-        for g in v2['franchises']:
-            if g in v1['franchises']:
-                model_sim = max(get_embedding_similarity(model, v1['franchises'], v2['franchises']), model_sim)
-                recs[k2] = model_sim
-
-        if model_sim > 0:
-            y_cos_sims.append(model_sim)
-        else:
-            y_cos_sims.append(0)
-            cos_zero_dict['model_sim'] += 1
-
-        #print("check y_pred (model_sim)")
-        #pdb.set_trace()
-
-        #print("check y_true (v2[recommended])")
-        #pdb.set_trace()
-        
-    game_recs[k1] = recs
-    
-    print("game: ", k1)
-    print("on " + str(game_count) + " of " + str(len(dataset)))
-    game_count += 1
-    total_pairs += [calculate_confusion_matrix(y_cos_sims, thresholds, y_true)]
-
-    print("observe y_true and y_pred - test hypothesis")
-    pdb.set_trace()
-
-    print("backup pdb")
-    pdb.set_trace()
-
-print("after for loop")
+print("check dataset X and y")
 pdb.set_trace()
 
-print("recs")
-print(recs)
+# train test split - 80% train, 20% test
+split = int(0.8 * len(X))
+X_train = np.array(X[0:split])
+y_train = np.array(y[0:split])
+X_test = np.array(X[split:])
+y_test = np.array(y[split:])
 
-#print("total_pairs")
-#print(total_pairs)
-
-avg_pairs = calculate_average_pairs(total_pairs)
-avg_tvals = avg_pairs[0]
-avg_fvals = avg_pairs[1]
-threshold_vals = avg_pairs[2]
-
+print("check train/test split")
 pdb.set_trace()
 
+"""
+3. Feed train and test set into SVM and evaluate the model.
+SVM is chosen because it works well with high-dimensional, natural language-driven data
+"""
+clf = make_pipeline(StandardScaler(), SVC(gamma='auto', kernel='rbf'))
+clf.fit(X_train, y_train)
+
+y_preds = clf.predict(X_test)
+print("F-1 score: ", f1_score(y_test, y_preds, average='binary'))
+
+RocCurveDisplay.from_estimator(clf, X_test, y_test)
 lin_x = np.linspace(0.0, 1.0, 11)
 lin_y = np.linspace(0.0, 1.0, 11)
-plt.plot(avg_fvals, avg_tvals)
 plt.plot(lin_x, lin_y, label='linear')  # Plot some data on the (implicit) axes.
 plt.xlabel("FPR")
 plt.ylabel("TPR")
-plt.title("ROC curve, averaged")
+plt.title("ROC curve")
 plt.show()
 
-print("number of total cos sims entries:")
-print(len(y_cos_sims))
+print("check evaluations")
+pdb.set_trace()
 
-plt.hist(y_cos_sims)
+"""
+4. Apply principal component analysis to reduce the dimension of the input word embeddings
+This will make the decision boundary easier to visualize (2 dimensions rather than N-space)
+"""
+pca = PCA(n_components = 2)
+X_lowdim = pca.fit_transform(X)
+clf.fit(X_lowdim, y)
+
+plot_decision_regions(np.array(X_lowdim), np.array(y), clf=clf, legend=2)
+
+# Adding axes annotations
+plt.xlabel('Word embedding')
+plt.title('SVM Visualization')
 plt.show()
 
-nonzero_cos_sims = [i for i in y_cos_sims if i > 0]
-
-print("number of nonzero cos sims entries:")
-print(len(nonzero_cos_sims))
-
-print("max freq of nonzero cos sims")
-# https://stackoverflow.com/questions/10797819/finding-the-mode-of-a-list
-print(max(set(nonzero_cos_sims), key=nonzero_cos_sims.count))
-
-plt.hist(nonzero_cos_sims)
-plt.show()
-
-plt.hist(nonzero_cos_sims, bins=100)
-plt.show()
-
-print("end time: ")
-print(time.time() - start_time)
+print("check visualizations")
+pdb.set_trace()
 
 print("final pdb")
 pdb.set_trace()
+
+print("final time")
+finaltime = time.time() - start_time
+print("final time (min): ", finaltime/60)
+
+# FIXME fix data sparseness (try SMOTE)
