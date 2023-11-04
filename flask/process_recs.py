@@ -38,6 +38,20 @@ def check_valid_deck_and_desc(deck, desc):
     return True
 
 """
+check_valid_demographics
+Check if each description of any given game demographic (genre, theme) are valid.
+Invalid information is any quality that is null or empty as a list
+Arguments: li (list)
+Returns: valid (boolean)
+"""
+def check_valid_demographics(li):
+    if li == None or len(li) == 0:
+        return False
+    if li[0] == '':
+        return False
+    return True
+
+"""
 check_for_valid_qualities
 Take each piece of game information and determine if that piece of information is usable for recommendation.
 Invalid information is any quality that is null or empty
