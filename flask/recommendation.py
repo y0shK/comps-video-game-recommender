@@ -7,14 +7,11 @@ import json
 import os
 from dotenv import load_dotenv
 import time
-from nltk.tokenize import RegexpTokenizer
-from nltk.corpus import stopwords
-import random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import random
 
-import tensorflow as tf
 import tensorflow_hub as hub
 from sklearn.svm import SVC
 from sklearn.pipeline import make_pipeline
@@ -24,9 +21,11 @@ from sklearn.metrics import RocCurveDisplay
 
 from sklearn.decomposition import PCA
 from mlxtend.plotting import plot_decision_regions
+from imblearn.over_sampling import SMOTE
+from collections import Counter
 
 from get_api_info import get_giantbomb_game_info, get_gamespot_games, get_similar_games
-from process_recs import process_text, check_for_valid_qualities, check_valid_deck_and_desc, get_embedding_similarity, get_embedding
+from process_recs import process_text, check_for_valid_qualities, check_valid_deck_and_desc, get_embedding_similarity, get_embedding, check_valid_demographics
 
 start_time = time.time()
 load_dotenv()
@@ -44,8 +43,7 @@ csv_titles_df = pd.read_csv("flask/metacritic_game_info.csv")
 1. Form a query set by combining games from metacritic csv and GameSpot API (all recommendation boolean == 0)
 Get titles from each of the data sources, then get information from API calls
 """
-csv_titles = list(set([i for i in csv_titles_df['Title']][0:15]))
-#csv_titles = list(set([i for i in csv_titles_df['Title']][0:100])) # 10 games
+csv_titles = list(set([i for i in csv_titles_df['Title']][0:15])) # 10 games
 print(csv_titles[0])
 print(len(csv_titles))
 pdb.set_trace()
@@ -58,25 +56,10 @@ for title in csv_titles:
 pdb.set_trace()
 
 # get gamespot games - (2 * 99) games before filtering
-gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, session=session)
+gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=1, session=session)
 
 query_set = {**query_set, **gamespot_games}
-
-"""
-similar_games_dict = {}
-for k, v in query_set.items():
-
-    # FIXME remove max_similar later
-    similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k, headers=HEADERS, max_similar=10, session=session)
-    if similar_games_instance == None or similar_games_instance == {}:
-        continue
-
-    for sk, sv in similar_games_instance.items():
-        
-    
-    
-
-"""
+print("dataset size: ", len(query_set))
 
 """
 2. Generate a train and test set for the model 
@@ -92,12 +75,13 @@ print("tf universal encoder set up!")
 X = []
 y = []
 
+game_counter = 1
 for k, v in query_set.items():
 
     # on a per game basis,
     # check similar games (which are recommended == 1 contingent on the query set game)
     # and check all other query set games (which are recommended == 0 since they are not similar)
-    similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k, headers=HEADERS, max_similar=10, session=session)
+    similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k, headers=HEADERS, session=session)
     if similar_games_instance == None or similar_games_instance == {}:
         continue
     
@@ -108,16 +92,20 @@ for k, v in query_set.items():
         if check_valid_deck_and_desc(deck, desc) == False:
             continue
 
+        #known_demographics = False
+
+        #if check_valid_demographics(sv['genres'], sv['themes']):
+         #   known_demographics = True
+
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
         tokenized_list = tokenized_deck + tokenized_desc
         word_embedding = get_embedding(model, tokenized_list)
 
+        #if known_demographics:
+         #   X.append((word_embedding, sv['genres'], sv['themes']))
         X.append(word_embedding)
         y.append(1)
-    
-    #not_similar_games_instance = [{k, v} for k, v in query_set.items() if k not in similar_games_instance.keys()]
-    #not_similar_games_instance = not_similar_games_instance[0]
 
     for nk, nv in query_set.items():
         if nk in similar_games_instance:
@@ -136,24 +124,62 @@ for k, v in query_set.items():
 
         X.append(word_embedding)
         y.append(0)
+    
+    print("currently on game", game_counter, "of", len(query_set))
+    game_counter += 1
 
 print("check dataset X and y")
 pdb.set_trace()
 
+print("Original dataset shape")
+print(Counter(y))
+
+pdb.set_trace()
+
+sm = SMOTE(random_state=42)
+X_res, y_res = sm.fit_resample(X, y)
+
+print("Resampled dataset shape")
+pdb.set_trace()
+print(Counter(y_res))
+
+print("Examine SMOTE")
+print(X_res[0:1])
+print(y_res[0:10])
+pdb.set_trace()
+
+# shuffle around X_res and y_res
+tuple_list = []
+
+for i in range(len(y_res)):
+    tuple_list.append((X_res[i], y_res[i]))
+
+random.shuffle(tuple_list)
+X_res_shuffle = [-1] * len(tuple_list)
+y_res_shuffle = [-1] * len(tuple_list)
+
+for i in range(len(tuple_list)):
+    X_res_shuffle[i] = tuple_list[i][0]
+    y_res_shuffle[i] = tuple_list[i][1]
+
+print("check shuffle")
+pdb.set_trace()
+
+X_res = X_res_shuffle
+y_res = y_res_shuffle
+
 # train test split - 80% train, 20% test
-split = int(0.8 * len(X))
-X_train = np.array(X[0:split])
-y_train = np.array(y[0:split])
-X_test = np.array(X[split:])
-y_test = np.array(y[split:])
+split = int(0.8 * len(X_res))
+X_train = np.array(X_res[0:split])
+y_train = np.array(y_res[0:split])
+X_test = np.array(X_res[split:])
+y_test = np.array(y_res[split:])
 
-print("check train/test split")
-pdb.set_trace()
-
-print("check if smote needed")
-print(y.count(0))
-print(y.count(1))
-pdb.set_trace()
+samples = [X_train, X_test, y_train, y_test]
+sample_strings = ['X_train', 'X_test', 'y_train', 'y_test']
+for sample in samples:
+    unique, counts = np.unique(sample, return_counts=True)
+    print("", sample, " ", unique, ": ", counts)
 
 """
 3. Feed train and test set into SVM and evaluate the model.
@@ -163,6 +189,10 @@ clf = make_pipeline(StandardScaler(), SVC(gamma='auto', kernel='rbf'))
 clf.fit(X_train, y_train)
 
 y_preds = clf.predict(X_test)
+print("y_preds")
+unique, counts = np.unique(y_preds, return_counts=True)
+print("y_preds: ", unique, counts)
+
 print("F-1 score: ", f1_score(y_test, y_preds, average='binary'))
 
 RocCurveDisplay.from_estimator(clf, X_test, y_test)
@@ -182,15 +212,20 @@ pdb.set_trace()
 This will make the decision boundary easier to visualize (2 dimensions rather than N-space)
 """
 pca = PCA(n_components = 2)
-X_lowdim = pca.fit_transform(X)
-clf.fit(X_lowdim, y)
+X_lowdim = pca.fit_transform(X_res)
+clf.fit(X_lowdim, y_res)
 
-plot_decision_regions(np.array(X_lowdim), np.array(y), clf=clf, legend=2)
+print("plot decision regions")
+pdb.set_trace()
+
+plot_decision_regions(np.array(X_lowdim), np.array(y_res), clf=clf, legend=2)
 
 # Adding axes annotations
-plt.xlabel('Word embedding')
-plt.ylabel('Recommendation of game')
+plt.xlabel('Word embedding value (dense)')
+plt.ylabel('Game recommendation')
 plt.title('Support Vector Machine visualization')
+plt.xlim(-1, 1)
+plt.ylim(-1, 1)
 plt.show()
 
 print("check visualizations")
@@ -202,6 +237,3 @@ pdb.set_trace()
 print("final time")
 finaltime = time.time() - start_time
 print("final time (min): ", finaltime/60)
-
-# FIXME remove artificial limit on similar_games
-# FIXME fix data sparseness (try SMOTE) if needed
