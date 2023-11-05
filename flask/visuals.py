@@ -3,6 +3,23 @@ import numpy as np
 from collections import Counter
 
 """
+update_demographic_dict
+Apply cumulative changes of frequency counts into dict as iteration occurs
+Arguments: current (str) - instance of demographic being added
+        dict0 (dict) - dictionary being modified
+Returns:
+        dict0
+"""
+def update_demographic_dict(current, dict0):
+
+    if current in dict0:
+        dict0[current] += 1
+    else:
+        dict0[current] = 1
+    
+    return dict0
+
+"""
 create_histogram
 Create demographic (genre, theme, etc.) histogram based on classification (0 or 1)
 Arguments: demographic (str)
@@ -19,6 +36,20 @@ def create_histogram(demographic, dict0, dict1, topN):
     g0 = [k for k in top5 if k in dict0]
     g1 = [k for k in top5 if k in dict1]
     common_g = [k for k in g0 if k in g1]
+
+    while len(common_g) < 4:
+        topN += 1
+        top_new = dict(Counter(tot).most_common(topN))  
+
+        g0 = [k for k in top_new if k in dict0]
+        g1 = [k for k in top_new if k in dict1]
+        common_g = [k for k in g0 if k in g1]
+
+
+    # remove "unknown" values
+    unknown_key = "unknown"
+    if unknown_key in common_g:
+        common_g = [k for k in common_g if k != "unknown"]
 
     d0 = {}
     for i in common_g:
