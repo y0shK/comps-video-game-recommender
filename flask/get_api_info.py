@@ -1,8 +1,11 @@
+"""
+Write wrappers to get information from API to clean up recommendation script
+"""
+
 import requests_cache
 import json
 from nltk.tokenize import RegexpTokenizer
 from nltk.corpus import stopwords
-import pdb
 
 my_session = requests_cache.CachedSession("my_new_cache")
 

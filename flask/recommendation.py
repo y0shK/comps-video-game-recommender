@@ -290,9 +290,6 @@ X_lowdim = pca.fit_transform(X_res)
 clf.fit(X_lowdim, y_res)
 plot_decision_regions(np.array(X_lowdim), np.array(y_res), clf=clf, legend=2)
 
-# FIXME clean up code
-# FIXME clean up git repo - unused files
-
 # Adding axes annotations
 plt.xlabel('Word embedding value (dense)')
 plt.ylabel('Game recommendation')

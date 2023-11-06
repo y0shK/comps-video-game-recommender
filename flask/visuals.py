@@ -1,3 +1,7 @@
+"""
+Make visuals (histograms of genre, theme, franchise)
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import Counter
@@ -11,12 +15,10 @@ Returns:
         dict0
 """
 def update_demographic_dict(current, dict0):
-
     if current in dict0:
         dict0[current] += 1
     else:
         dict0[current] = 1
-    
     return dict0
 
 """
@@ -24,7 +26,7 @@ create_histogram
 Create demographic (genre, theme, etc.) histogram based on classification (0 or 1)
 Arguments: demographic (str)
         dict0, dict1 (dict) - dictionaries to combine for binary classification frequency visualization
-        topN - how many elements should be in the histogram
+        topN (int) - how many elements should be in the histogram
 Returns: none (displays graph)
 """
 def create_histogram(demographic, dict0, dict1, topN):
