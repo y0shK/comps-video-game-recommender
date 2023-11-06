@@ -38,7 +38,7 @@ HEADERS = {'User-Agent': 'Video Game Recommender Comprehensive Project'}
 GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 
 # https://www.kaggle.com/datasets/dahlia25/metacritic-video-game-comments - use metacritic_game_info.csv to parse
-csv_titles_df = pd.read_csv("flask/metacritic_game_info.csv")
+csv_titles_df = pd.read_csv("metacritic_game_info.csv")
 
 """
 1. Form a query set by combining games from metacritic csv and GameSpot API (all recommendation boolean == 0)
