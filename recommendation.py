@@ -25,7 +25,7 @@ from imblearn.over_sampling import SMOTE
 from collections import Counter
 
 from get_api_info import get_giantbomb_game_info, get_gamespot_games, get_similar_games
-from process_recs import process_text, check_valid_deck_and_desc, get_embedding, check_valid_demographics
+from process_recs import process_text, check_valid_name, check_valid_deck_and_desc, get_embedding, check_valid_demographics
 from visuals import update_demographic_dict, create_histogram
 
 start_time = time.time()
@@ -57,7 +57,7 @@ for title in csv_titles:
 pdb.set_trace()
 
 # get gamespot games - (2 * 99) games before filtering
-gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, session=session)
+gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=1, session=session)
 
 query_set = {**query_set, **gamespot_games}
 print("dataset size: ", len(query_set))
@@ -76,6 +76,11 @@ print("tf universal encoder set up!")
 X = []
 y = []
 
+# create X_titles and X_embeddings
+# create a bijection between them to pass embeddings into SMOTE and then restore information after
+X_titles = []
+X_embeddings = []
+
 genres_dict_1 = {}
 themes_dict_1 = {}
 franchises_dict_1 = {}
@@ -87,17 +92,8 @@ franchises_dict_0 = {}
 print("Length of dataset:")
 print(len(query_set))
 
-explain_dataset_dict = {'no_similar_games': 0,
-                        'sim_no_valid_deck_desc': 0,
-                        'no_sim_no_valid_deck_desc': 0,
-                        'is_similar_game': 0,
-                        'recorded': 0}
-
-
 game_counter = 1
 
-# current run: len(query_set) = 209
-# 163 have similar games, 46 do not
 for k, v in query_set.items():
 
     # on a per game basis,
@@ -105,17 +101,18 @@ for k, v in query_set.items():
     # and check all other query set games (which are recommended == 0 since they are not similar)
     similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k, headers=HEADERS, session=session)
     if similar_games_instance == None or similar_games_instance == {}:
-        explain_dataset_dict['no_similar_games'] += 1
-        #print("no similar games")
         continue
     
     for sk, sv in similar_games_instance.items():
+        name = sv['name']
         deck = sv['deck']
         desc = sv['description']
+        similar_embed = {}
+
+        if check_valid_name(name) == False:
+            continue
 
         if check_valid_deck_and_desc(deck, desc) == False:
-            explain_dataset_dict['sim_no_valid_deck_desc'] += 1
-            #print("no valid deck/desc")
             continue
 
         tokenized_deck = process_text(deck)
@@ -123,7 +120,14 @@ for k, v in query_set.items():
         tokenized_list = tokenized_deck + tokenized_desc
         word_embedding = get_embedding(model, tokenized_list)
         
-        X.append(word_embedding)
+        #similar_embed[name] = {'name': name,
+        #                       'embedding': word_embedding}                 
+        similar_embed[name] = word_embedding
+
+        X_titles.append(name)
+        X_embeddings.append(word_embedding)
+
+        X.append([similar_embed])
         y.append(1)
 
         # add demographics (genre, theme, franchise) to see the frequency of each appearance with rec=1
@@ -150,20 +154,19 @@ for k, v in query_set.items():
         themes_dict_1 = update_demographic_dict(current_theme, themes_dict_1)
         franchises_dict_1 = update_demographic_dict(current_franchise, franchises_dict_1)
 
-        explain_dataset_dict['recorded'] += 1
-        
     for nk, nv in query_set.items():
         if nk in similar_games_instance:
-            explain_dataset_dict['is_similar_game'] += 1
-            #print("is similar game")
             continue
 
+        name = nv['name']
         deck = nv['deck']
         desc = nv['description']
+        not_similar_embed = {}
+
+        if check_valid_name(name) == False:
+            continue
 
         if check_valid_deck_and_desc(deck, desc) == False:
-            explain_dataset_dict['no_sim_no_valid_deck_desc'] += 1
-            #print("no valid deck/desc")
             continue
 
         known_genre = check_valid_demographics(nv['genres'])
@@ -175,7 +178,14 @@ for k, v in query_set.items():
         tokenized_list = tokenized_deck + tokenized_desc
         word_embedding = get_embedding(model, tokenized_list)
 
-        X.append(word_embedding)
+        #not_similar_embed[name] = {'name': name,
+        #                          'embedding': word_embedding}
+        not_similar_embed[name] = word_embedding
+
+        X_titles.append(name)
+        X_embeddings.append(word_embedding)
+
+        X.append([not_similar_embed])
         y.append(0)
 
         # add genre and theme to see the frequency of each appearance with rec=1
@@ -202,21 +212,34 @@ for k, v in query_set.items():
         themes_dict_0 = update_demographic_dict(current_theme, themes_dict_0)
         franchises_dict_0 = update_demographic_dict(current_franchise, franchises_dict_0)
 
-        explain_dataset_dict['recorded'] += 1
-    
     print("currently on iteration", game_counter)
     game_counter += 1
 
-    print(explain_dataset_dict)
-
-print("explain dataset")
-for k, v in explain_dataset_dict.items():
-    print("reason : count")
-    print(k, v)
-
-print(sum(explain_dataset_dict.values())) # should be len(query_dict)^2
-
 print("check dataset X and y")
+pdb.set_trace()
+
+print("check x_titles and x_embeddings")
+pdb.set_trace()
+
+print("lengths of x_titles, x_embeddings, x, y")
+print(len(X_titles))
+print(len(X_embeddings))
+print(len(X))
+print(len(y))
+
+# create bijection (to preserve ordering) from titles to embeddings
+"""
+X_bijection = {}
+for i in range(len(X_titles)):
+        if X_titles[i] not in X_bijection:
+            X_bijection[X_titles[i]] = X_embeddings[i]
+"""
+X_bijection = []
+for i in range(len(X_titles)):
+        if X_titles[i] not in X_bijection:
+            X_bijection.append({X_titles[i] : X_embeddings[i]})
+
+print("check bijection")
 pdb.set_trace()
 
 print("Original dataset shape")
@@ -227,19 +250,46 @@ print(Counter(y))
 pdb.set_trace()
 
 sm = SMOTE(random_state=42)
-X_res, y_res = sm.fit_resample(X, y)
+X_res_embeds, y_res = sm.fit_resample(X_embeddings, y)
 
-print("Examine genres and themes of resample")
+print("Examine X and y of resample")
+pdb.set_trace()
+print(len(X_res_embeds))
+print(len(y_res))
+
+# reconstruct whole dataset
+# if X_res_embeds[i] is original, add it
+# else, add it with a placeholder
+# this is done to keep title information
+# make list of dicts
+X_new = []
+
+for embed in X_res_embeds:
+
+    # if embed is also in X_embeddings, it is original and not SMOTE
+    # add it accordingly
+    #is_in_list = np.any(np.all(embed == X_embeddings))
+
+    if embed in np.array(X_embeddings):
+        for i in range(len(X_bijection)):
+            np_vals = np.array(X_bijection[i].values())
+            if np.array_equal(np_vals, embed):
+                new_entry = {}
+                new_entry[X_titles[i]] = np_vals
+                X_new.append([new_entry])
+    else:
+        X_new.append([{'SMOTE': embed}])
+
+print("check X_new")
+print(len(X_new))
+print(len(X_new) == len(y_res))
 pdb.set_trace()
 
 print("Resampled dataset shape")
 pdb.set_trace()
 print(Counter(y_res))
 
-print("Examine SMOTE")
-print(X_res[0:1])
-print(y_res[0:10])
-pdb.set_trace()
+X_res = X_new
 
 # shuffle around X_res and y_res
 tuple_list = []
@@ -268,11 +318,14 @@ y_train = np.array(y_res[0:split])
 X_test = np.array(X_res[split:])
 y_test = np.array(y_res[split:])
 
+print("check train test split")
+pdb.set_trace()
+
 samples = [X_train, X_test, y_train, y_test]
 sample_strings = ['X_train', 'X_test', 'y_train', 'y_test']
-for sample in samples:
-    unique, counts = np.unique(sample, return_counts=True)
-    print("", sample, " ", unique, ": ", counts)
+#for sample in samples:
+ #   unique, counts = np.unique(sample, return_counts=True)
+  #  print("", sample, " ", unique, ": ", counts)
 
 """
 3a. Perform dimensionality reduction with PCA to project the N-dimensional word embedding vectors onto R^2
@@ -313,37 +366,13 @@ disp = ConfusionMatrixDisplay(confusion_matrix=cm)
 disp.plot()
 plt.show()
 
-RocCurveDisplay.from_estimator(clf, X_test_lowdim, y_test)
-lin_x = np.linspace(0.0, 1.0, 11)
-lin_y = np.linspace(0.0, 1.0, 11)
-plt.plot(lin_x, lin_y, label='linear')  # Plot some data on the (implicit) axes.
-plt.xlabel("FPR")
-plt.ylabel("TPR")
-plt.title("ROC curve")
-plt.show()
+print("check evaluations")
+pdb.set_trace()
 
 # show double bar chart of game demographics
 create_histogram("Genres", genres_dict_0, genres_dict_1, 3)
 create_histogram("Themes", themes_dict_0, themes_dict_1, 3)
 create_histogram("Franchises", franchises_dict_0, franchises_dict_1, 3)
-
-print("check evaluations")
-pdb.set_trace()
-
-print("plot decision regions")
-pdb.set_trace()
-
-X_lowdim = pca.fit_transform(X_res)
-clf.fit(X_lowdim, y_res)
-plot_decision_regions(np.array(X_lowdim), np.array(y_res), clf=clf, legend=2)
-
-# Adding axes annotations
-plt.xlabel('Word embedding value (dense)')
-plt.ylabel('Game recommendation')
-plt.title('Support Vector Machine visualization')
-plt.xlim(-1, 1)
-plt.ylim(-1, 1)
-plt.show()
 
 print("check visualizations")
 pdb.set_trace()

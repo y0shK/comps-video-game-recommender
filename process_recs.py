@@ -23,6 +23,19 @@ def process_text(game_text):
     return tokenized_text
 
 """
+check_valid_name
+Check to make sure title is valid
+Invalid information is any name that is null or empty
+Arguments: name (str)
+Returns: valid (boolean)
+"""
+def check_valid_name(name):
+    if name == None or name == '':
+        return False
+    
+    return True
+
+"""
 check_valid_deck_and_desc
 Check to make sure that string inputs to the word embeddings (deck and description) are valid.
 Invalid information is any quality that is null or empty

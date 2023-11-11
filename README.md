@@ -21,4 +21,4 @@ This project is a supervised learning model that uses word embeddings of short-f
 * https://www.gamespot.com/api/documentation
 
 ### Resources used
-* https://www.tensorflow.org/hub/tutorials/semantic\_similarity\_with\_tf\_hub\_universal\_encoder 
+* https://www.tensorflow.org/hub/tutorials/semantic_similarity_with_tf_hub_universal_encoder 
