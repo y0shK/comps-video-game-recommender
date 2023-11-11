@@ -84,7 +84,20 @@ genres_dict_0 = {}
 themes_dict_0 = {}
 franchises_dict_0 = {}
 
+print("Length of dataset:")
+print(len(query_set))
+
+explain_dataset_dict = {'no_similar_games': 0,
+                        'sim_no_valid_deck_desc': 0,
+                        'no_sim_no_valid_deck_desc': 0,
+                        'is_similar_game': 0,
+                        'recorded': 0}
+
+
 game_counter = 1
+
+# current run: len(query_set) = 209
+# 163 have similar games, 46 do not
 for k, v in query_set.items():
 
     # on a per game basis,
@@ -92,6 +105,8 @@ for k, v in query_set.items():
     # and check all other query set games (which are recommended == 0 since they are not similar)
     similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k, headers=HEADERS, session=session)
     if similar_games_instance == None or similar_games_instance == {}:
+        explain_dataset_dict['no_similar_games'] += 1
+        #print("no similar games")
         continue
     
     for sk, sv in similar_games_instance.items():
@@ -99,6 +114,8 @@ for k, v in query_set.items():
         desc = sv['description']
 
         if check_valid_deck_and_desc(deck, desc) == False:
+            explain_dataset_dict['sim_no_valid_deck_desc'] += 1
+            #print("no valid deck/desc")
             continue
 
         tokenized_deck = process_text(deck)
@@ -132,15 +149,21 @@ for k, v in query_set.items():
         genres_dict_1 = update_demographic_dict(current_genre, genres_dict_1)
         themes_dict_1 = update_demographic_dict(current_theme, themes_dict_1)
         franchises_dict_1 = update_demographic_dict(current_franchise, franchises_dict_1)
+
+        explain_dataset_dict['recorded'] += 1
         
     for nk, nv in query_set.items():
         if nk in similar_games_instance:
+            explain_dataset_dict['is_similar_game'] += 1
+            #print("is similar game")
             continue
 
         deck = nv['deck']
         desc = nv['description']
 
         if check_valid_deck_and_desc(deck, desc) == False:
+            explain_dataset_dict['no_sim_no_valid_deck_desc'] += 1
+            #print("no valid deck/desc")
             continue
 
         known_genre = check_valid_demographics(nv['genres'])
@@ -178,14 +201,27 @@ for k, v in query_set.items():
         genres_dict_0 = update_demographic_dict(current_genre, genres_dict_0)
         themes_dict_0 = update_demographic_dict(current_theme, themes_dict_0)
         franchises_dict_0 = update_demographic_dict(current_franchise, franchises_dict_0)
+
+        explain_dataset_dict['recorded'] += 1
     
-    print("currently on game", game_counter, "of", len(query_set))
+    print("currently on iteration", game_counter)
     game_counter += 1
+
+    print(explain_dataset_dict)
+
+print("explain dataset")
+for k, v in explain_dataset_dict.items():
+    print("reason : count")
+    print(k, v)
+
+print(sum(explain_dataset_dict.values())) # should be len(query_dict)^2
 
 print("check dataset X and y")
 pdb.set_trace()
 
 print("Original dataset shape")
+print(len(X))
+print(len(y))
 print(Counter(y))
 
 pdb.set_trace()
@@ -251,12 +287,23 @@ pca = PCA(n_components = 2) # we want 2 dimensions to visualize
 X_train_lowdim = pca.fit_transform(X_train)
 X_test_lowdim = pca.fit_transform(X_test)
 
+print("X_train_lowdim: ")
+print(X_train_lowdim[0:2])
+print(y_train[0:2])
+
+print("X_test_lowdim length")
+print(len(X_test_lowdim))
+
 clf.fit(X_train_lowdim, y_train) 
 y_preds_lowdim = clf.predict(X_test_lowdim)
 
 print("y_preds")
 unique, counts = np.unique(y_preds_lowdim, return_counts=True)
 print("y_preds: ", unique, counts)
+
+print("length of y_preds_lowdim, and y_test")
+print(len(y_preds_lowdim))
+print(len(y_test))
 
 # evaluations
 print("F-1 score: ", f1_score(y_test, y_preds_lowdim, average='binary'))
