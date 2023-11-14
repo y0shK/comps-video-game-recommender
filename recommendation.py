@@ -17,10 +17,8 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import f1_score
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-from sklearn.metrics import RocCurveDisplay
 
 from sklearn.decomposition import PCA
-from mlxtend.plotting import plot_decision_regions
 from imblearn.over_sampling import SMOTE
 from collections import Counter
 
@@ -57,7 +55,7 @@ for title in csv_titles:
 pdb.set_trace()
 
 # get gamespot games - (2 * 99) games before filtering
-gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=1, session=session)
+gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, session=session)
 
 query_set = {**query_set, **gamespot_games}
 print("dataset size: ", len(query_set))
@@ -75,11 +73,6 @@ print("tf universal encoder set up!")
 # y is the recommendation boolean
 X = []
 y = []
-
-# create X_titles and X_embeddings
-# create a bijection between them to pass embeddings into SMOTE and then restore information after
-X_titles = []
-X_embeddings = []
 
 genres_dict_1 = {}
 themes_dict_1 = {}
@@ -102,12 +95,27 @@ for k, v in query_set.items():
     similar_games_instance = get_similar_games(api_key=GIANTBOMB_API_KEY, query=k, headers=HEADERS, session=session)
     if similar_games_instance == None or similar_games_instance == {}:
         continue
-    
+
+    # train the SVM on both initial game (k) and potential recommendation (signal: sk or noise: nk)
+    # e.g., SVM(initial = Breakout and rec = Tetris) = 1
+    # SVM(initial = BG3 and rec = Tetris) = 0
+    # use name, deck, and description
+
+    if check_valid_name(v['name']) == False:
+        continue
+
+    if check_valid_deck_and_desc(v['deck'], v['description']) == False:
+        continue
+
+    init_name = process_text(v['name'])
+    init_deck = process_text(v['deck'])
+    init_desc = process_text(v['description'])
+    init_tokenized_list = init_name + init_deck + init_desc
+
     for sk, sv in similar_games_instance.items():
         name = sv['name']
         deck = sv['deck']
         desc = sv['description']
-        similar_embed = {}
 
         if check_valid_name(name) == False:
             continue
@@ -115,19 +123,13 @@ for k, v in query_set.items():
         if check_valid_deck_and_desc(deck, desc) == False:
             continue
 
+        tokenized_name = process_text(name)
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
-        tokenized_list = tokenized_deck + tokenized_desc
+        tokenized_list = init_tokenized_list + tokenized_name + tokenized_deck + tokenized_desc
         word_embedding = get_embedding(model, tokenized_list)
-        
-        #similar_embed[name] = {'name': name,
-        #                       'embedding': word_embedding}                 
-        similar_embed[name] = word_embedding
 
-        X_titles.append(name)
-        X_embeddings.append(word_embedding)
-
-        X.append([similar_embed])
+        X.append(word_embedding)
         y.append(1)
 
         # add demographics (genre, theme, franchise) to see the frequency of each appearance with rec=1
@@ -173,19 +175,13 @@ for k, v in query_set.items():
         known_theme = check_valid_demographics(nv['themes'])
         known_franchise = check_valid_demographics(nv['franchises'])
 
+        tokenized_name = process_text(name)
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
-        tokenized_list = tokenized_deck + tokenized_desc
+        tokenized_list = init_tokenized_list + tokenized_name + tokenized_deck + tokenized_desc
         word_embedding = get_embedding(model, tokenized_list)
 
-        #not_similar_embed[name] = {'name': name,
-        #                          'embedding': word_embedding}
-        not_similar_embed[name] = word_embedding
-
-        X_titles.append(name)
-        X_embeddings.append(word_embedding)
-
-        X.append([not_similar_embed])
+        X.append(word_embedding)
         y.append(0)
 
         # add genre and theme to see the frequency of each appearance with rec=1
@@ -218,30 +214,6 @@ for k, v in query_set.items():
 print("check dataset X and y")
 pdb.set_trace()
 
-print("check x_titles and x_embeddings")
-pdb.set_trace()
-
-print("lengths of x_titles, x_embeddings, x, y")
-print(len(X_titles))
-print(len(X_embeddings))
-print(len(X))
-print(len(y))
-
-# create bijection (to preserve ordering) from titles to embeddings
-"""
-X_bijection = {}
-for i in range(len(X_titles)):
-        if X_titles[i] not in X_bijection:
-            X_bijection[X_titles[i]] = X_embeddings[i]
-"""
-X_bijection = []
-for i in range(len(X_titles)):
-        if X_titles[i] not in X_bijection:
-            X_bijection.append({X_titles[i] : X_embeddings[i]})
-
-print("check bijection")
-pdb.set_trace()
-
 print("Original dataset shape")
 print(len(X))
 print(len(y))
@@ -250,46 +222,16 @@ print(Counter(y))
 pdb.set_trace()
 
 sm = SMOTE(random_state=42)
-X_res_embeds, y_res = sm.fit_resample(X_embeddings, y)
+X_res, y_res = sm.fit_resample(X, y)
 
 print("Examine X and y of resample")
 pdb.set_trace()
-print(len(X_res_embeds))
+print(len(X_res))
 print(len(y_res))
-
-# reconstruct whole dataset
-# if X_res_embeds[i] is original, add it
-# else, add it with a placeholder
-# this is done to keep title information
-# make list of dicts
-X_new = []
-
-for embed in X_res_embeds:
-
-    # if embed is also in X_embeddings, it is original and not SMOTE
-    # add it accordingly
-    #is_in_list = np.any(np.all(embed == X_embeddings))
-
-    if embed in np.array(X_embeddings):
-        for i in range(len(X_bijection)):
-            np_vals = np.array(X_bijection[i].values())
-            if np.array_equal(np_vals, embed):
-                new_entry = {}
-                new_entry[X_titles[i]] = np_vals
-                X_new.append([new_entry])
-    else:
-        X_new.append([{'SMOTE': embed}])
-
-print("check X_new")
-print(len(X_new))
-print(len(X_new) == len(y_res))
-pdb.set_trace()
 
 print("Resampled dataset shape")
 pdb.set_trace()
 print(Counter(y_res))
-
-X_res = X_new
 
 # shuffle around X_res and y_res
 tuple_list = []
@@ -323,9 +265,9 @@ pdb.set_trace()
 
 samples = [X_train, X_test, y_train, y_test]
 sample_strings = ['X_train', 'X_test', 'y_train', 'y_test']
-#for sample in samples:
- #   unique, counts = np.unique(sample, return_counts=True)
-  #  print("", sample, " ", unique, ": ", counts)
+for sample in samples:
+    unique, counts = np.unique(sample, return_counts=True)
+    print("", sample, " ", unique, ": ", counts)
 
 """
 3a. Perform dimensionality reduction with PCA to project the N-dimensional word embedding vectors onto R^2
@@ -365,6 +307,79 @@ print(cm)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm)
 disp.plot()
 plt.show()
+
+# add some test cases for evaluation
+# fit PCA on test1_query and a test1_query similar game
+# then transform PCA on test1_rec and test1_rec2
+# this is: SVM(query = Breakout, rec = Tetris) -> 1
+# SVM(query = Breakout, rec = Baldur's Gate) -> 0
+# to test, get information of query and proposed recommendation from API
+# then tokenize to get into right format and feed into SVM
+test1_query = 'Breakout'
+test1_rec = 'Tetris'
+test1_rec2 = "Baldur's Gate"
+
+# fit PCA on test1_query and similar game
+sim_game = get_similar_games(api_key=GIANTBOMB_API_KEY, query=test1_query, headers=HEADERS, max_similar=1, session=session)
+
+for k, v in sim_game.items():
+    sim_game_name = v['name']
+    sim_game_deck = v['deck']
+    sim_game_desc = v['description']
+
+sim_tokenized_list = process_text(sim_game_name + sim_game_deck + sim_game_desc)
+sim_embedding = get_embedding(model, sim_tokenized_list)
+
+test1_query_info = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=test1_query, headers=HEADERS, session=session)
+test1_rec_info = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=test1_rec, headers=HEADERS, session=session)
+test1_rec2_info = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=test1_rec2, headers=HEADERS, session=session)
+
+print("check game info")
+pdb.set_trace()
+
+for k, v in test1_query_info.items():
+    test1_query_name = v['name']
+
+for k, v in test1_rec_info.items():
+    test1_rec_name = v['name']
+
+for k, v in test1_rec2_info.items():
+    test1_rec2_name = v['name']
+
+t1qname = test1_query_info[test1_query_name]['name']
+t1qdeck = test1_query_info[test1_query_name]['deck']
+t1qdesc = test1_query_info[test1_query_name]['description']
+
+t1rname = test1_rec_info[test1_rec_name]['name']
+t1rdeck = test1_rec_info[test1_rec_name]['deck']
+t1rdesc = test1_rec_info[test1_rec_name]['description']
+
+t1rname2 = test1_rec2_info[test1_rec2_name]['name']
+t1rdeck2 = test1_rec2_info[test1_rec2_name]['deck']
+t1rdesc2 = test1_rec2_info[test1_rec2_name]['description']
+
+print("check extracted attributes")
+pdb.set_trace()
+
+query_tokenized_list = process_text(t1qname + t1qdeck + t1qdesc)
+rec_tokenized_list = process_text(t1rname + t1rdeck + t1rdesc)
+rec2_tokenized_list = process_text(t1rname2 + t1rdeck2 + t1rdesc2)
+
+query_embed = get_embedding(model, query_tokenized_list)
+rec1_embed = get_embedding(model, rec_tokenized_list) 
+rec2_embed = get_embedding(model, rec2_tokenized_list)
+
+query_sim_fit_lowdim = pca.fit([query_embed] + [sim_embedding])
+
+rec1_lowdim = pca.transform([rec1_embed])
+rec1_pred = clf.predict(rec1_lowdim)
+print('Given', test1_query, 'recommend', test1_rec, ':', rec1_pred)
+
+rec2_lowdim = pca.transform([rec2_embed])
+rec2_pred = clf.predict(rec2_lowdim)
+print('Given', test1_query, 'recommend', test1_rec2, ':', rec1_pred)
+
+pdb.set_trace()
 
 print("check evaluations")
 pdb.set_trace()

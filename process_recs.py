@@ -15,7 +15,7 @@ stops = set(stopwords.words("english"))
 process_text
 Take game text (deck/description) and return tokenized version ready for use with cosine similarity
 Arguments: game_text (str)
-Returns: tokenized_text (str)
+Returns: tokenized_text (list)
 """
 def process_text(game_text):
     text_words = list(set(tokenizer.tokenize(game_text)) - stops)
