@@ -101,32 +101,32 @@ for k, v in query_set.items():
     # SVM(initial = BG3 and rec = Tetris) = 0
     # use name, deck, and description
 
-    if check_valid_name(v['name']) == False:
-        continue
+    #if check_valid_name(v['name']) == False:
+     #   continue
 
     if check_valid_deck_and_desc(v['deck'], v['description']) == False:
         continue
 
-    init_name = process_text(v['name'])
+    #init_name = process_text(v['name'])
     init_deck = process_text(v['deck'])
     init_desc = process_text(v['description'])
-    init_tokenized_list = init_name + init_deck + init_desc
+    init_tokenized_list = init_deck + init_desc
 
     for sk, sv in similar_games_instance.items():
         name = sv['name']
         deck = sv['deck']
         desc = sv['description']
 
-        if check_valid_name(name) == False:
-            continue
+        #if check_valid_name(name) == False:
+          #  continue
 
         if check_valid_deck_and_desc(deck, desc) == False:
             continue
 
-        tokenized_name = process_text(name)
+        #tokenized_name = process_text(name)
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
-        tokenized_list = init_tokenized_list + tokenized_name + tokenized_deck + tokenized_desc
+        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc
         word_embedding = get_embedding(model, tokenized_list)
 
         X.append(word_embedding)
@@ -160,13 +160,13 @@ for k, v in query_set.items():
         if nk in similar_games_instance:
             continue
 
-        name = nv['name']
+        #name = nv['name']
         deck = nv['deck']
         desc = nv['description']
         not_similar_embed = {}
 
-        if check_valid_name(name) == False:
-            continue
+        #if check_valid_name(name) == False:
+         #   continue
 
         if check_valid_deck_and_desc(deck, desc) == False:
             continue
@@ -175,10 +175,10 @@ for k, v in query_set.items():
         known_theme = check_valid_demographics(nv['themes'])
         known_franchise = check_valid_demographics(nv['franchises'])
 
-        tokenized_name = process_text(name)
+        #tokenized_name = process_text(name)
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
-        tokenized_list = init_tokenized_list + tokenized_name + tokenized_deck + tokenized_desc
+        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc
         word_embedding = get_embedding(model, tokenized_list)
 
         X.append(word_embedding)
@@ -308,6 +308,7 @@ disp = ConfusionMatrixDisplay(confusion_matrix=cm)
 disp.plot()
 plt.show()
 
+# FIXME add more test cases
 # add some test cases for evaluation
 # fit PCA on test1_query and a test1_query similar game
 # then transform PCA on test1_rec and test1_rec2
@@ -323,11 +324,11 @@ test1_rec2 = "Baldur's Gate"
 sim_game = get_similar_games(api_key=GIANTBOMB_API_KEY, query=test1_query, headers=HEADERS, max_similar=1, session=session)
 
 for k, v in sim_game.items():
-    sim_game_name = v['name']
+    #sim_game_name = v['name']
     sim_game_deck = v['deck']
     sim_game_desc = v['description']
 
-sim_tokenized_list = process_text(sim_game_name + sim_game_deck + sim_game_desc)
+sim_tokenized_list = process_text(sim_game_deck + sim_game_desc)
 sim_embedding = get_embedding(model, sim_tokenized_list)
 
 test1_query_info = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=test1_query, headers=HEADERS, session=session)
@@ -346,24 +347,24 @@ for k, v in test1_rec_info.items():
 for k, v in test1_rec2_info.items():
     test1_rec2_name = v['name']
 
-t1qname = test1_query_info[test1_query_name]['name']
+#t1qname = test1_query_info[test1_query_name]['name']
 t1qdeck = test1_query_info[test1_query_name]['deck']
 t1qdesc = test1_query_info[test1_query_name]['description']
 
-t1rname = test1_rec_info[test1_rec_name]['name']
+#t1rname = test1_rec_info[test1_rec_name]['name']
 t1rdeck = test1_rec_info[test1_rec_name]['deck']
 t1rdesc = test1_rec_info[test1_rec_name]['description']
 
-t1rname2 = test1_rec2_info[test1_rec2_name]['name']
+#t1rname2 = test1_rec2_info[test1_rec2_name]['name']
 t1rdeck2 = test1_rec2_info[test1_rec2_name]['deck']
 t1rdesc2 = test1_rec2_info[test1_rec2_name]['description']
 
 print("check extracted attributes")
 pdb.set_trace()
 
-query_tokenized_list = process_text(t1qname + t1qdeck + t1qdesc)
-rec_tokenized_list = process_text(t1rname + t1rdeck + t1rdesc)
-rec2_tokenized_list = process_text(t1rname2 + t1rdeck2 + t1rdesc2)
+query_tokenized_list = process_text(t1qdeck + t1qdesc)
+rec_tokenized_list = process_text(t1rdeck + t1rdesc)
+rec2_tokenized_list = process_text(t1rdeck2 + t1rdesc2)
 
 query_embed = get_embedding(model, query_tokenized_list)
 rec1_embed = get_embedding(model, rec_tokenized_list) 
