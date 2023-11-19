@@ -24,6 +24,7 @@ from collections import Counter
 
 from get_api_info import get_giantbomb_game_info, get_gamespot_games, get_similar_games
 from process_recs import process_text, check_valid_name, check_valid_deck_and_desc, get_embedding, check_valid_demographics
+from testcases import run_testcase
 from visuals import update_demographic_dict, create_histogram
 
 start_time = time.time()
@@ -99,15 +100,11 @@ for k, v in query_set.items():
     # train the SVM on both initial game (k) and potential recommendation (signal: sk or noise: nk)
     # e.g., SVM(initial = Breakout and rec = Tetris) = 1
     # SVM(initial = BG3 and rec = Tetris) = 0
-    # use name, deck, and description
-
-    #if check_valid_name(v['name']) == False:
-     #   continue
+    # use deck and description
 
     if check_valid_deck_and_desc(v['deck'], v['description']) == False:
         continue
 
-    #init_name = process_text(v['name'])
     init_deck = process_text(v['deck'])
     init_desc = process_text(v['description'])
     init_tokenized_list = init_deck + init_desc
@@ -117,13 +114,9 @@ for k, v in query_set.items():
         deck = sv['deck']
         desc = sv['description']
 
-        #if check_valid_name(name) == False:
-          #  continue
-
         if check_valid_deck_and_desc(deck, desc) == False:
             continue
 
-        #tokenized_name = process_text(name)
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
         tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc
@@ -160,13 +153,9 @@ for k, v in query_set.items():
         if nk in similar_games_instance:
             continue
 
-        #name = nv['name']
         deck = nv['deck']
         desc = nv['description']
         not_similar_embed = {}
-
-        #if check_valid_name(name) == False:
-         #   continue
 
         if check_valid_deck_and_desc(deck, desc) == False:
             continue
@@ -175,7 +164,6 @@ for k, v in query_set.items():
         known_theme = check_valid_demographics(nv['themes'])
         known_franchise = check_valid_demographics(nv['franchises'])
 
-        #tokenized_name = process_text(name)
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
         tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc
@@ -308,7 +296,6 @@ disp = ConfusionMatrixDisplay(confusion_matrix=cm)
 disp.plot()
 plt.show()
 
-# FIXME add more test cases
 # add some test cases for evaluation
 # fit PCA on test1_query and a test1_query similar game
 # then transform PCA on test1_rec and test1_rec2
@@ -316,74 +303,19 @@ plt.show()
 # SVM(query = Breakout, rec = Baldur's Gate) -> 0
 # to test, get information of query and proposed recommendation from API
 # then tokenize to get into right format and feed into SVM
-test1_query = 'Breakout'
-test1_rec = 'Tetris'
-test1_rec2 = "Baldur's Gate"
 
-# fit PCA on test1_query and similar game
-sim_game = get_similar_games(api_key=GIANTBOMB_API_KEY, query=test1_query, headers=HEADERS, max_similar=1, session=session)
+# expected 1
+run_testcase(query='Breakout', rec='Tetris', model=model, pca=pca, clf=clf, \
+             gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-for k, v in sim_game.items():
-    #sim_game_name = v['name']
-    sim_game_deck = v['deck']
-    sim_game_desc = v['description']
+# expected 0
+run_testcase(query='Breakout', rec="Baldur's Gate", model=model, pca=pca, clf=clf, \
+             gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-sim_tokenized_list = process_text(sim_game_deck + sim_game_desc)
-sim_embedding = get_embedding(model, sim_tokenized_list)
+# expected 1
+run_testcase(query='Super Mario Bros', rec="The Great Giana Sisters", model=model, pca=pca, clf=clf, \
+             gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-test1_query_info = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=test1_query, headers=HEADERS, session=session)
-test1_rec_info = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=test1_rec, headers=HEADERS, session=session)
-test1_rec2_info = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=test1_rec2, headers=HEADERS, session=session)
-
-print("check game info")
-pdb.set_trace()
-
-for k, v in test1_query_info.items():
-    test1_query_name = v['name']
-
-for k, v in test1_rec_info.items():
-    test1_rec_name = v['name']
-
-for k, v in test1_rec2_info.items():
-    test1_rec2_name = v['name']
-
-#t1qname = test1_query_info[test1_query_name]['name']
-t1qdeck = test1_query_info[test1_query_name]['deck']
-t1qdesc = test1_query_info[test1_query_name]['description']
-
-#t1rname = test1_rec_info[test1_rec_name]['name']
-t1rdeck = test1_rec_info[test1_rec_name]['deck']
-t1rdesc = test1_rec_info[test1_rec_name]['description']
-
-#t1rname2 = test1_rec2_info[test1_rec2_name]['name']
-t1rdeck2 = test1_rec2_info[test1_rec2_name]['deck']
-t1rdesc2 = test1_rec2_info[test1_rec2_name]['description']
-
-print("check extracted attributes")
-pdb.set_trace()
-
-query_tokenized_list = process_text(t1qdeck + t1qdesc)
-rec_tokenized_list = process_text(t1rdeck + t1rdesc)
-rec2_tokenized_list = process_text(t1rdeck2 + t1rdesc2)
-
-query_embed = get_embedding(model, query_tokenized_list)
-rec1_embed = get_embedding(model, rec_tokenized_list) 
-rec2_embed = get_embedding(model, rec2_tokenized_list)
-
-query_sim_fit_lowdim = pca.fit([query_embed] + [sim_embedding])
-
-rec1_lowdim = pca.transform([rec1_embed])
-rec1_pred = clf.predict(rec1_lowdim)
-print('Given', test1_query, 'recommend', test1_rec, ':', rec1_pred)
-
-rec2_lowdim = pca.transform([rec2_embed])
-rec2_pred = clf.predict(rec2_lowdim)
-print('Given', test1_query, 'recommend', test1_rec2, ':', rec1_pred)
-
-pdb.set_trace()
-
-print("check evaluations")
-pdb.set_trace()
 
 # show double bar chart of game demographics
 create_histogram("Genres", genres_dict_0, genres_dict_1, 3)

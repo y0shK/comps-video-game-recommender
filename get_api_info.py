@@ -143,7 +143,7 @@ def normalize_qualities(quality):
 get_giantbomb_game_info
 Get information from GiantBomb API for a given query game (e.g., coming from the csv read-in)
 Arguments:
-    api_key (string): API key for GameSpot
+    api_key (string): API key for GiantBomb
     query (string): query to search within API call
     headers (string): specify User-Agent field
     session (CachedSession): optional session to store results in local cache
