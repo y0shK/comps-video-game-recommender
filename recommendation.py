@@ -24,7 +24,7 @@ from collections import Counter
 
 from get_api_info import get_giantbomb_game_info, get_gamespot_games, get_similar_games
 from process_recs import process_text, check_valid_name, check_valid_deck_and_desc, get_embedding, check_valid_demographics
-from testcases import run_testcase
+from testcases import run_testcase, get_pca_fit, get_transform_embed
 from visuals import update_demographic_dict, create_histogram
 
 start_time = time.time()
@@ -56,7 +56,7 @@ for title in csv_titles:
 pdb.set_trace()
 
 # get gamespot games - (2 * 99) games before filtering
-gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, session=session)
+gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=1, session=session)
 
 query_set = {**query_set, **gamespot_games}
 print("dataset size: ", len(query_set))
@@ -296,26 +296,34 @@ disp = ConfusionMatrixDisplay(confusion_matrix=cm)
 disp.plot()
 plt.show()
 
-# add some test cases for evaluation
-# fit PCA on test1_query and a test1_query similar game
-# then transform PCA on test1_rec and test1_rec2
-# this is: SVM(query = Breakout, rec = Tetris) -> 1
-# SVM(query = Breakout, rec = Baldur's Gate) -> 0
-# to test, get information of query and proposed recommendation from API
-# then tokenize to get into right format and feed into SVM
+"""
+4. Add some test cases for evaluation
+Fit PCA on a query and a similar game to the query.
+Then transform PCA on the proposed recommendation.
+Example runs:
+    - SVM(query = Breakout, rec = Tetris) -> 1
+    - SVM(query = Breakout, rec = Baldur's Gate) -> 0
 
-# expected 1
-run_testcase(query='Breakout', rec='Tetris', model=model, pca=pca, clf=clf, \
+Testing procedure:
+Get information of query and proposed recommendation from API
+Tokenize to get into right format and feed into SVM
+"""
+
+# expected 1 - received 1
+run_testcase(query='Breakout', rec='Tetris', model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+
+# expected 0 - received 1
+run_testcase(query='Breakout', rec="Baldur's Gate", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+
+# expected 1 - received 0
+run_testcase(query='Super Mario Bros', rec="The Great Giana Sisters", model=model, clf=clf, \
              gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 0
-run_testcase(query='Breakout', rec="Baldur's Gate", model=model, pca=pca, clf=clf, \
-             gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+# expected 0 - 0 (preprocessing did not obtain sufficient results from API call, returned 0 by default)
+run_testcase(query="Cooking Mama", rec="Sekiro", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 1
-run_testcase(query='Super Mario Bros', rec="The Great Giana Sisters", model=model, pca=pca, clf=clf, \
-             gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
-
+print("check testcases")
+pdb.set_trace()
 
 # show double bar chart of game demographics
 create_histogram("Genres", genres_dict_0, genres_dict_1, 3)
