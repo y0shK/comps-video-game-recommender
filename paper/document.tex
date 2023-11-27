@@ -30,6 +30,8 @@
 
 \maketitle
 
+% FIXME put references in each section
+ 
 \section{Introduction and Problem Context}
 
 %This section should motivate why the project is interesting both to you and to the computer science community or the general public.
@@ -65,8 +67,11 @@
     Supervised ML.
         Machine learning
         Supervised learning
+            synthetic minority oversampling
         SVM algorithm
-
+            Relevant processes for SVM output
+            Dimensionality reduction
+            
     Relevant NLP content
         TF-IDF
         Word embeddings
@@ -83,6 +88,8 @@
 
         Collaborative filtering - Quantic Foundry, Steam Recommender
 
+        TODO find papers about Spotify and Netflix using CF
+
     Papers.
 
         Collaborative filtering
@@ -97,6 +104,8 @@
             Ryan et al. https://eis.ucsc.edu/papers/ryanEtAl_PeopleTendToLikeRelatedGames.pdf
 
             Vu and Bezemer - https://asgaard.ece.ualberta.ca/wp-content/uploads/2021/04/quang_fdg2021.pdf
+
+            Wang et al. https://www.sciencedirect.com/science/article/pii/S0950705118302107
 
         Combination of above two methods
 
@@ -119,16 +128,24 @@
             NLP in RS
             TODO search "nlp for recommender system"
 
-                Guo et al. https://dl.acm.org/doi/pdf/10.1145/3292500.3332290
-                
+                Berbatova - https://aclanthology.org/R19-2009.pdf
 
-            TODO search "word embeddings recommender system"
+                Reuver et al. - https://aclanthology.org/2021.hackashop-1.7.pdf
 
-            TODO get tf-idf prior work
-            
+                Asani et al. - https://www.sciencedirect.com/science/article/pii/S2666827021000578 (sentiment analysis)
+
+            "word embeddings recommender system"
+
+            Nguyen et al. - https://onlinelibrary.wiley.com/doi/pdf/10.1002/cpe.6232
+
+            https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8609619
+
+            tf-idf prior work
+
+            Meidl, Zhang, Wang
+
+            Wang paper: https://www.sciencedirect.com/science/article/pii/S0950705118302107
     
-
-        See Lit Review Google document.
     
 \end{comment}
 
@@ -138,6 +155,84 @@
 %What are you building? How will it combine/incorporate ideas from the literature? Be specific about what you will be doing: talk about the specific algorithm you will implement/use, the specific dataset/platform/API, and what the outcome of your project will look like.
 %All of these decisions should be justified as well.
 
+% The approach to the project is clearly laid out, and justified with respect to literature and the goals of the project. Alternate approaches and why they are not used are discussed.
+
+\begin{comment}
+    Building a supervised learning algorithm using SVM. Given a query and a potential recommendation as input, provide whether the recommendation makes sense with respect to the query as output.
+
+    Ideas from the literature require lot of data of user profiles and preferences (Spotify, Netflix, etc.) This is typically used in platforms that have social impact and immense user interaction. Instead, use a proxy of API recommendations as ground truth and build a model to recommend based on that ground truth. (There is plenty of precedent in the literature for ML approaches to recommendation)
+
+    Then, the goal is to build a supervised learning problem from a ground truth dataset source. Instead of using content-based approaches and collaborative filtering, transform problem into supervised learning problem
+
+    Approach:
+
+    - Dataset.
+
+    Fetched game titles, demographics (genre/theme/franchise), and deck (short form tagline) and description (long-form paragraph) from API call
+
+    Combined Metacritic CSV and GameSpot API
+    GiantBomb API
+
+    Then created the dataset using the results of both API calls. (Combined into one big games dictionary)
+    
+    Iterate through games dictionary G. Let g be the current game being looked at in the games dictionary. Then get the similar games for g; call that set of similar games S. Iterate through S; store word embeddings of tokenized deck and description in X and mark each similar game (Y=1). Then iterate through all games in (G-S); store word embeddings of tokenized deck and description in X and mark each game in that iteration as Y=0.
+
+    FIXME put in sample input PNG
+
+    - Preprocessing.
+
+    synthetic minority oversampling - there is a class imbalance (many more 0s than 1s). So, perform SMOTE to generate close points in N-space to balance out the classes for binary classification 
+
+    FIXME Cite literature for SMOTE
+    https://www.jair.org/index.php/jair/article/view/10302
+    
+
+    Dimensionality reduction. Since word embedding vectors can't be visualized, use principal component analysis to project the word embedding vectors into a 2D space, which allows us to conceptually understand
+
+    FIXME Cite literature for dimensionality reduction
+
+    - Algorithm.
+
+    SVM is used because it scales well to high dimensional data ("One remarkable property of SVMs is that their ability to learn can be independent of the dimensionality of the feature space.") Joachims https://wiki.eecs.yorku.ca/course_archive/2013-14/W/6339/_media/joachims_98a.pdf
+
+    Why is SVM used instead of other supervised learning algorithms?
+
+    Logistic regression - deals with continuous data with real-world, inherently meaningful implications. For example, LogReg can be used to model housing prices given distance from the beach or highway - in this case, data is a real-world value (since it is a physical quantity of distance) and it is continuous (since we allow for arbitrarily specific measurement). On the other hand, word embedding data is not inherently meaningful - we cannot glean any physical intuition from a word embedding vector element of 0.25
+
+    KNN - clustering is not needed for this problem. Similarity is obtained from the GiantBomb API. Because we are using the API to determine ground truth similarity, we don't need an algorithm that determines similarity via clustering or inter-cluster distance
+
+    Decision tree / random forest. In tree-based models, we have enumerably many features that are isolated before model training. E.g., we have distance from beach and highway for housing price. In this case, natural language is used as input (deck/description), which makes it hard to isolate numerical, inherently meaningful features ahead of time.
+
+    So,
+
+    SVM algorithm trained on word embeddings of deck and description. The tokenized list of deck/description comes from both the game and potential recommendation. E.g.,
+
+    query = "Breakout"
+    rec = "Tetris"
+    word_embedding = word embedding(query deck + query desc + rec deck + rec desc tokenized)
+
+    X.append(word_embedding)
+    y.append(0 or 1)
+
+    FIXME put in example train and test PNG
+
+    Why is word embedding used instead of TF-IDF? TF-IDF uses sparse word vectors, so the majority of the elements coming from the vectors are zero elements. (There are artificial positive matches between queries and potential recommendations because all vectors contain mostly 0s, so the overlap is the same even if the nonzero content is not.) By contrast, word embeddings use dense word vectors, so the majority of the elements are NOT zero elements.
+
+    - Outcome.
+
+    Feed query game and potential recommendation into SVM. Then the output is whether or not the game should be recommended.
+    
+    Example runs / testcases:
+    - SVM(query = Breakout, rec = Tetris) -> 1
+    - SVM(query = Breakout, rec = Baldur's Gate) -> 0
+
+    FIXME put image of testcases from VSCode terminal
+
+    This outcome meets the goal of the project. The idea is to use supervised learning techniques to create a ML model that can perform this recommendation task (i.e., given g and r, say if r is an appropriate recommendation for g). The testcases show sample outputs of the pipeline. 
+    
+\end{comment}
+
+
 \section{Evaluation Metrics}
 
 %This section describes how you will evaluate your project.
@@ -145,7 +240,91 @@
 %You might think about what would result in an F, a C, or an A for comps.
 %Alternately, think about what are the minimal requirements for passing the class, what you might do if you had more time and resources, and what the best case scenario would be if everything went swimmingly.
 
-\section{Evaluation Results and Discussion}
+% The metrics used and method of collection are clearly explained and justified with respect to the literature and the goal of the project. Other metrics and why they are not used are discussed.
+
+\begin{comment}
+
+    Evaluation metrics:
+
+    Problem is turned from a content-based/CF problem into a supervised learning problem. This means that immense user data and log of preferences is no longer needed. Instead, use standard ML metrics for supervised learning.
+
+    What metrics are not being used?
+
+    Cosine similarity. Even though cosine similarity is used frequently in the literature, it is used in cases where a "bag of words" method applies - i.e., word order and context doesn't matter, we only look at raw counts and frequencies. In this case, since paragraphs of natural language rather than simply word frequencies are considered, the bag of words assumption cannot be used.
+
+    Metrics for recommender systems which focus on user input (liked/disliked) vs. ML numerical results
+
+    Novelty, serendipity, etc. These are valuable when the evaluation concerns value of product (e.g., would user like the recommended game/movie/app etc.) Instead, my project is focused on maximizing TP and TN, which is a purely numerical metric independent of user input
+    
+    https://dl.acm.org/doi/10.1145/1864708.1864721
+
+    ____
+    See this literature:
+
+    https://dl.acm.org/doi/abs/10.1145/1328854.1328855 - "cosine similarity has proven to be a robust metric for scoring the similarity between two strings, and it is increasingly being used in complex queries" - database management but NOT natural language processing
+
+    FIXME check if https://ieeexplore.ieee.org/abstract/document/7349760 uses cosine similarity effectively in a way that is not relevant for my use caese
+
+    ____
+    
+    
+    FIXME find literature that uses standard ML metrics
+
+    - Standard ML metrics 
+        Precision
+        recall
+        F-1 score
+        Confusion matrix visualization
+
+
+    - Testcase performance
+
+        How well does the recommender output conform to test case output?
+
+    - Human vs. ML output agreement?
+
+        If a reasonably knowledgeable volunteer (i.e., self reported interest and basic schema) has similar output as algorithm output 
+
+    Minimum viable product - pipeline is explainable and performance outperforms random guessing. (Given a class balance, random guessing is right 50% of the time - can the model outperform this?)
+
+    More time and resources - pipeline is explainable and performance outperforms random guessing w/ agreement from several testcase suites and human volunteers
+
+    Best case scenario: pipeline is explainable and performance outperforms random guessing w/ agreement from several testcase suites and human volunteers, and NLP approaches would be validated by human volunteers
+    
+\end{comment}
+
+\section{Results and Discussion}
+
+% The stated metrics are used and the results explained with respect to the methods. Alternate explanations and caveats to the results are explored. The results are connected to the goals of the project.
+
+\begin{comment}
+
+    Precision: 0.774
+    Recall: 0.644
+    F-1: 0.703
+    Confusion matrix attached
+
+    FIXME show confusion matrix
+
+    Testcase performance:
+    2 out of 3 passed 
+
+    UPDATE - 3 out of 7 passed
+    Breakout - Tetris - 1 - green
+    Breakout - BG - 1 - red
+    Super Mario Bros - The Great Giana Sisters - 1 - green
+
+    Results make sense given methods. The metrics indicate that precision is greater than recall, implying that FP is less than FN. So, the model makes the trade-off of being more correct when its prediction is "recommendation" (lower FP) at the cost of missing some valid recommendations in total (higher FN). This makes sense when considering the training method - word embeddings of deck and description for both query and potential recommendation were used to train the SVM. So, the algorithm is more likely to hesitate if the natural language input does not clearly indicate a match between q and r, improving its precision at the cost of its recall.
+
+    It is also possible that natural language processing input to algorithm automatically reduces recall. Even if two games have the exact same demographic characteristics (genre, theme, franchise), if the way in which their deck/description are framed is sufficiently different, the model will take that into consideration. For example, consider recommending given the first Super Mario Bros game given the original Donkey Kong arcade game. The genre (platformer) and franchise (Mario) are the same, but the descriptions may very significantly ("arcade machine" vs. "blockbuster home console video game"). In this way, an algorithm trained on word embeddings will miss what is otherwise an accurate recommendation. Future work can involve training the model beyond word embeddings so that it can capture similar qualitative aspects of the game. (this improves recall)
+
+    On the other hand, it is also possible that further NLP approaches like sentiment analysis would also improve accuracy. By the same token, it is possible that two games have no demographic in common (different genre, theme, and franchise) but have similar text describing them. For instance, "groundbreaking 3D graphics" could describe Super Mario 64 or Gran Turismo - without context, both of those statements could be true. Considering NLP methods like dependency parsing or sentiment analysis in this case is a potential way to contextualize text so that mixups across demographics are less frequent. (this improves precision)
+
+    Results also meet the goals of the project. Given a query game g and a potential recommendation r, the SVM outputs either a 0 (don't recommend) or a 1 (do recommend)
+
+    Limitations include emphasis on word embeddings to train SVM algorithm. So, future work can include using NLP approaches like sentiment analysis, dependency parsing, etc. in order to further pinpoint game relatedness
+    
+\end{comment}
 
 %limitations
 
@@ -155,18 +334,77 @@
 %You might think about whether your project perpetuates societal inequity (or could be used by others to do so), whether the data/platforms you are using is collected with informed consent and free of bias, and whether you might be subject to technological solutionism instead of working support/better the public infrastructure.
 %Include a discussion of how you plan to mitigate these issues in your project.
 
+\begin{comment}
+    Data bias. Like any machine learning project, the model is only as good (or as biased) as the data which is put in. The model receives data from Metacritic, GameSpot, and GiantBomb APIs. This means that it receives text data from verified reviewers who have write access to those websites, but it will not get the perspective of the average video game player. In terms of perspectives represented, then, the model overrepresents the critical perspective and ignores the average players' thoughts.
+
+    FIXME cite Bertie Vidgen, Leon Derczynski. Directions in abu-
+sive language training data, a systematic review:
+Garbage in, garbage out. https://journals.
+plos . org / plosone / article ? id = 10 .
+1371 / journal . pone . 0243300 # sec030.
+Online; accessed 9 April 2023. 2020.
+
+While some abusive content in annotated
+datasets is openly hostile or inappropriate, ”edge cases”
+such as ironic statements, slander/misinformation, and in-
+tention of the speaker can change the classification.
+
+    HOW TO ADDRESS: collect reviews from as many sources as possible, not just 1 individual API. Future work if more time was involved could include scraping review content from average players (from forums, Google reviews, etc.)
+
+    Potential for abusive content. Any NLP application which uses natural language possibly has to contend with abusive content, which includes (but is not limited to) hate speech, casual racism/sexism/other discrimination, etc. Care has to be taken to make sure that this sort of speech is not learned and casually amplified by the model.
+
+    HOW TO ADDRESS: not as relevant in this NLP app because strictly deck/description are used (not reviews). If reviews are used, there are ways to check for hate speech 
+
+    n example of such error checking is to
+ensure that the language provided by the user is not active
+hate speech. Mathew et al. provide a benchmark dataset of
+hate speech, tagging classification, community involved and
+rationale of speaker. [5] Performing a search to ensure that
+any provided input string is not found within the hate speech
+dataset is one possible way to error check before the string
+is forwarded to the algorithm. 
+
+    FIXME add paper to citation
+ Binny Mathew, Punyajoy Saha, Seid Muhie Yimam,
+Chris Biemann, Pawan Goyal, Animesh Mukherjee.
+HateXplain: A Benchmark Dataset for Explainable
+Hate Speech Detection. https : / / ojs . aaai .
+org / index . php / AAAI / article / view /
+17745. Online; accessed 12 April 2023.
+\end{comment}
+
+% The project is considered both in its complete technological and societal context. Issues of bias and diversity are explored in detail, and potential contributions to global and local inequity examined. Relevant literature is cited.
+
 \section{Future Work, and Conclusion}
 
-\section{Timeline}
+\begin{comment}
 
-%A timeline of major milestones, with specific items to be completed by specific dates/months.
-%Note that this timeline must start over the summer; otherwise you will unlikely have enough time to complete a project of the expected scope.
-%As part of the discussion around your timeline, talk about what you already know that would help you with the project, and what you expect to have to learn to be successful.
-%Include programming languages, technical concepts, as well as processes (e.g., user testing).
+    Future work can involve training the model beyond word embeddings so that it can capture similar qualitative aspects of the game. (this improves recall)
+
+    So, future work can include using NLP approaches like sentiment analysis, dependency parsing, etc. in order to further pinpoint game relatedness
+
+    Future work if more time was involved could include scraping review content from average players (from forums, Google reviews, etc.)
+
+    Conclusion:
+
+    
+    
+\end{comment}
 
 \section{Code Documentation}
 
 This section will demonstrate that you have thought through the basics of how your code will work. You should include a diagram of the overall data flow of your program, including what the inputs and outputs of each component will be, and how they will be represented.
+
+% Dataset constructed from name/deck/description/genre/theme/franchise obtained from API call
+
+% Let q be the query game, and let r be the potential recommendation given the query. Let S be the set of similar games for q as obtained from GiantBomb. Then,
+
+% Training of algorithm:
+% X = word embedding(q deck + q desc + r deck + r desc), y = 0 or 1. If r in S, y=1. If r not in S, y=0
+
+% Sample run of algorithm.
+% Input: q, r
+% SVM(q, r) -> 0 or 1
 
 \section{Appendices}
 
