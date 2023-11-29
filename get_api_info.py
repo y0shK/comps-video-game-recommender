@@ -15,7 +15,6 @@ stops = set(stopwords.words("english"))
 """
 get_gamespot_game_info
 Provide dictionary-based information about individual games and their qualities (description, themes, etc.)
-Gets reviews and foreign keys into the game
 Arguments:
     api_key (string): API key for GameSpot
     headers (string): specify User-Agent field
@@ -58,8 +57,8 @@ def get_gamespot_game_info(api_key, headers, offset, session=my_session):
                             'description': game['description'], 
                             'genres': genre_list, 
                             'themes': theme_list, 
-                            'franchises': franchise_list, 
-                            'recommended' : 0} # used in y_true
+                            'franchises': franchise_list,
+                            'review': ''}
     return game_data
 
 """
@@ -175,8 +174,8 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         'description': '', 
         'genres': '', 
         'themes': '', 
-        'franchises': '', 
-        'recommended' : 0
+        'franchises': '',
+        'review': ''
     }}
 
     for i in range(min(num_results, 5)):
@@ -245,7 +244,7 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         'genres': query_genre, 
         'themes': query_theme, 
         'franchises': query_franchise, 
-        'recommended': 0
+        'review': ''
     }
 
     return query_game_dict
@@ -299,8 +298,8 @@ def get_similar_games(api_key, query, headers, max_similar=-1, session=my_sessio
         'description': '', 
         'genres': '', 
         'themes': '', 
-        'franchises': '', 
-        'recommended' : 0
+        'franchises': '',
+        'review': ''
     }}
 
     # return dummy game if no such query is found
@@ -311,7 +310,7 @@ def get_similar_games(api_key, query, headers, max_similar=-1, session=my_sessio
             game_not_found = False
 
     if game_results == None or game_not_found:
-        #return dummy_game
+        # return dummy game
         return {}
     
     # else, get all the similar games for the given query
@@ -334,7 +333,8 @@ def get_similar_games(api_key, query, headers, max_similar=-1, session=my_sessio
     similar_games_list = []
 
     if similar_games_to_query == None:
-        #return dummy_game # no similar games worth noting
+        # return dummy game 
+        # no similar games worth noting
         return {}
     
     if max_similar == -1: # no user argument provided
@@ -395,5 +395,5 @@ def get_similar_games(api_key, query, headers, max_similar=-1, session=my_sessio
                             'genres': genre_list,
                             'franchises': franchise_list,
                             'themes': theme_list,
-                            'recommended': 1}
+                            'review': ''}
     return similar_games_output

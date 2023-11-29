@@ -15,7 +15,7 @@ import tensorflow_hub as hub
 from sklearn.svm import SVC
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 from sklearn.decomposition import PCA
@@ -23,8 +23,8 @@ from imblearn.over_sampling import SMOTE
 from collections import Counter
 
 from get_api_info import get_giantbomb_game_info, get_gamespot_games, get_similar_games
-from process_recs import process_text, check_valid_name, check_valid_deck_and_desc, get_embedding, check_valid_demographics
-from testcases import run_testcase, get_pca_fit, get_transform_embed
+from process_recs import process_text, check_valid_deck_and_desc, return_valid_review, get_embedding, check_valid_demographics
+from testcases import run_testcase
 from visuals import update_demographic_dict, create_histogram
 
 start_time = time.time()
@@ -36,33 +36,58 @@ GAMESPOT_API_KEY = os.getenv('GAMESPOT_API_KEY')
 HEADERS = {'User-Agent': 'Video Game Recommender Comprehensive Project'}
 GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 
-# https://www.kaggle.com/datasets/dahlia25/metacritic-video-game-comments - use metacritic_game_info.csv to parse
+# https://www.kaggle.com/datasets/dahlia25/metacritic-video-game-comments
+# use metacritic_game_info.csv to parse games
+# then use metacritic_game_user_comments.csv to get reviews for each game
 csv_titles_df = pd.read_csv("metacritic_game_info.csv")
+csv_reviews_df = pd.read_csv("metacritic_game_user_comments.csv")
 
 """
-1. Form a query set by combining games from metacritic csv and GameSpot API (all recommendation boolean == 0)
+1. Form a query set by combining games from metacritic csv and GameSpot API
 Get titles from each of the data sources, then get information from API calls
 """
-csv_titles = list(set([i for i in csv_titles_df['Title']][0:15])) # 10 games
+csv_titles = list(set([i for i in csv_titles_df['Title']][0:40])) # 30 games
+
+#print(list(set([i for i in csv_reviews_df['Title']])))
+#pdb.set_trace()
+
 print(csv_titles[0])
 print(len(csv_titles))
 pdb.set_trace()
 
-query_set = {}
+# get reviews with respect to their csv titles
+title_review_lookup = {}
+
 for title in csv_titles:
-    query_dict = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=title, headers=HEADERS,session=session)
-    query_set = {**query_set, **query_dict}
+    title_review_lookup[title] = ''
 
 pdb.set_trace()
 
-# get gamespot games - (2 * 99) games before filtering
-gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=1, session=session)
+for row in csv_reviews_df.iterrows():
+        if row[1]['Title'] in title_review_lookup:
+                title_review_lookup[row[1]['Title']] += row[1]['Comment']
+
+pdb.set_trace()
+
+query_set = {}
+for title in title_review_lookup:
+    query_dict = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=title, headers=HEADERS,session=session)
+    #pdb.set_trace()
+    if title in query_dict.keys():
+        query_dict[title]['review'] = title_review_lookup[title]
+    query_set = {**query_set, **query_dict}
+
+print("check reviews")
+pdb.set_trace()
+
+# get gamespot games - (game_count * 99) games before filtering
+gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, session=session)
 
 query_set = {**query_set, **gamespot_games}
 print("dataset size: ", len(query_set))
 
 """
-2. Generate a train and test set for the model 
+2. Split dataset into a train and test set for the model 
 """
 # set up tf universal encoder for cosine similarity comparisons on sentence embeddings
 module_url = "https://tfhub.dev/google/universal-sentence-encoder/4"
@@ -107,7 +132,8 @@ for k, v in query_set.items():
 
     init_deck = process_text(v['deck'])
     init_desc = process_text(v['description'])
-    init_tokenized_list = init_deck + init_desc
+    init_review = return_valid_review(v['review'])
+    init_tokenized_list = init_deck + init_desc + init_review
 
     for sk, sv in similar_games_instance.items():
         name = sv['name']
@@ -119,7 +145,8 @@ for k, v in query_set.items():
 
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
-        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc
+        tokenized_review = return_valid_review(sv['review'])
+        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review
         word_embedding = get_embedding(model, tokenized_list)
 
         X.append(word_embedding)
@@ -166,7 +193,8 @@ for k, v in query_set.items():
 
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
-        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc
+        tokenized_review = return_valid_review(sv['review'])
+        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review
         word_embedding = get_embedding(model, tokenized_list)
 
         X.append(word_embedding)
@@ -289,6 +317,8 @@ print(len(y_preds_lowdim))
 print(len(y_test))
 
 # evaluations
+print("precision: ", precision_score(y_test, y_preds_lowdim, average='binary'))
+print("recall: ", recall_score(y_test, y_preds_lowdim, average='binary'))
 print("F-1 score: ", f1_score(y_test, y_preds_lowdim, average='binary'))
 cm = confusion_matrix(y_test, y_preds_lowdim)
 print(cm)
@@ -315,12 +345,30 @@ run_testcase(query='Breakout', rec='Tetris', model=model, clf=clf, gamespot_key=
 # expected 0 - received 1
 run_testcase(query='Breakout', rec="Baldur's Gate", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 1 - received 0
+# expected 1 - received 1
 run_testcase(query='Super Mario Bros', rec="The Great Giana Sisters", model=model, clf=clf, \
              gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 0 - 0 (preprocessing did not obtain sufficient results from API call, returned 0 by default)
-run_testcase(query="Cooking Mama", rec="Sekiro", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+# expected 1 - received 0
+run_testcase(query="The Legend of Zelda: Breath of the Wild", rec="Horizon Zero Dawn", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+
+# expected 0 - received 1
+run_testcase(query="The Legend of Zelda: Breath of the Wild", rec="Sid Meier's Civilization V", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+
+# expected 1 - received 1
+run_testcase(query="Super Mario Galaxy 2", rec="Banjo-Tooie", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+
+# expected 0 - received 1
+run_testcase(query="Super Mario Galaxy 2", rec="Sid Meier's Civilization V", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+
+# expected 0 - received 1
+run_testcase(query="The Legend of Zelda: Ocarina of Time", rec="Darksiders", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+
+# expected 1 - received 1
+run_testcase(query="The Legend of Zelda: Ocarina of Time", rec="The Legend of Zelda: Breath of the Wild", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+
+# expected 1 - received 1
+run_testcase(query="Super Mario Galaxy", rec="Super Mario Galaxy 2", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
 print("check testcases")
 pdb.set_trace()

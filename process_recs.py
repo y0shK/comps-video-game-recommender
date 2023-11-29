@@ -13,7 +13,7 @@ stops = set(stopwords.words("english"))
 
 """
 process_text
-Take game text (deck/description) and return tokenized version ready for use with cosine similarity
+Take game text (deck/description) and return tokenized version ready for use with word embeddings
 Arguments: game_text (str)
 Returns: tokenized_text (list)
 """
@@ -49,6 +49,18 @@ def check_valid_deck_and_desc(deck, desc):
         return False
     
     return True
+
+"""
+return_valid_review
+Return tokenized review to add to word embedding if possible, else return empty list (uninformative)
+Arguments: review (str)
+Returns: valid_review (list of tokenized str or empty list)
+"""
+def return_valid_review(review):
+    if review != '':
+        return process_text(review)
+    else:
+        return []
 
 """
 check_valid_demographics

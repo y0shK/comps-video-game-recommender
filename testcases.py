@@ -5,7 +5,6 @@ Create and run test cases to examine SVM output
 from sklearn.decomposition import PCA
 from get_api_info import get_similar_games, get_giantbomb_game_info
 from process_recs import process_text, get_embedding, check_valid_deck_and_desc
-import pdb
 
 """
 get_pca_fit
@@ -96,9 +95,6 @@ def run_testcase(query, rec, model, clf, gamespot_key, giantbomb_key, headers, s
         print(query, "not enough info to recommend")
         return 0
 
-    print("PCA check")
-    pdb.set_trace()
-
     rec_info = get_giantbomb_game_info(api_key=giantbomb_key, query=rec, headers=headers, session=session)
     for k, v in rec_info.items():
         r_name = v['name']
@@ -112,10 +108,6 @@ def run_testcase(query, rec, model, clf, gamespot_key, giantbomb_key, headers, s
     # transform PCA on potential recommendation game
     rec_lowdim = fit_pca.transform([rec_embed])
     rec_pred = clf.predict(rec_lowdim)
-    print('Given', query, 'recommend', rec, ':', rec_pred)
+    print('Given', query, ', recommend', rec, ':', rec_pred)
 
-    print("recommendation pca")
-    print(rec_lowdim)
-
-    print("clf prediction based on query")
     return rec_pred
