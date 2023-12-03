@@ -39,21 +39,56 @@
 %As a rough guideline, your project should be either narrow but deep in a subfield of CS, or broadly reaching across subfields without being too shallow.
 %It should be comparable to the amount of work/content in an upper-level elective.
 
-\begin{comment}
-    Why the project is interesting.
-    To me:
-        - want to gain experience in ML, particularly in setting up a real-world problem (as opposed to problems specifically engineered for textbooks)
-        - video games are one of my hobbies, and I have seen the various ways sources of video game-related text can arise (reviews, descriptions, forums, etc.) - use NLP to inform ML model
-    To general public:
-        - recommender systems are prevalent in today's highly technological society. (Buying things on Amazon, watching content on Netflix, connecting with people on Facebook, professional development on LinkedIn, etc. - all use recommendation systems)
-        - supervised learning is becoming part of recommender system infrastructure (particularly for content-based, rather than collaborative filtering-based, aspects)
+%\begin{comment}
+ %   Why the project is interesting.
+  %  To me:
+   %     - want to gain experience in ML, particularly in setting up a real-world problem (as opposed to problems specifically engineered for textbooks)
+    %    - video games are one of my hobbies, and I have seen the various ways sources of video game-related text can arise (reviews, descriptions, forums, etc.) - use NLP to inform ML model
+    %To general public:
+     %   - recommender systems are prevalent in today's highly technological society. (Buying things on Amazon, watching content on Netflix, connecting with people on Facebook, professional development on LinkedIn, etc. - all use recommendation systems)
 
-    Difficulty of project:
-    - ML - deciding, obtaining, and preprocessing data in an ethical, efficient way. This is good practice for the real world
-    - iterative ML algorithm improvement - how to identify breakpoints and be skeptical of results, then make iterative changes to algorithm to fix results
-\end{comment}
+    %YouTube recommender system https://dl.acm.org/doi/pdf/10.1145/1864708.1864770
+   % Netfix recommender https://dl.acm.org/doi/pdf/10.1145/2843948
+   % Linkedin Recommender https://dl.acm.org/doi/pdf/10.1145/3109859.3109921
+   % Amazon https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=7927889
+        
+      %  - supervised learning is becoming part of recommender %system infrastructure (particularly for content-based, rather than collaborative filtering-based, aspects)
+
+  %  Difficulty of project:
+  %  - ML - deciding, obtaining, and preprocessing data in an ethical, efficient way. This is good practice for the real world
+  %  - iterative ML algorithm improvement - how to identify breakpoints and be skeptical of results, then make iterative changes to algorithm to fix results
+%\end{comment}
+
+Working on this project is interesting to me because it provides an opportunity to combine machine learning (ML), natural language processing (NLP), and real-world data analysis into one problem. In terms of ML, I want to gain ML experience to be able to apply it in my career going forward (possibly in a healthcare-oriented context). Focusing on video games as the subject for the supervised machine learning problem has also allowed me to tap into an immense amount of text-based video game data (descriptions, reviews, and other qualitative aspects). In this way, I can use NLP ideas as ML features and apply them to a subject of interest. The real-world nature of this problem is also stimulating and challenging, because the data comes from an API that requires authentication and preprocessing rather than a cleanly defined, open-access dataset found in a textbook. These three aspects of the problem have motivated my work in comps and have helped me grow as a developer and machine learning researcher.
+
+On the societal level, recommender systems are critical to today's highly technological, choice-laden society. These recommender systems are found in many different aspects of life. Commercial settings (like Amazon \cite{AmazonRS}), video content platforms (YouTube \cite{YouTubeRS} and Netflix \cite{NetflixRS}), and social media websites (LinkedIn \cite{LinkedInRS}) are just a few examples. Supervised learning (especially self-supervised variants of supervised learning algorithms) is an approach that is explored in the implementation of these recommender systems. Addressing data sparsity, alleviating the "cold start" problem of not having an initial suggestion to base future recommendations on, and including temporal aspects of recommendation as user sentiment changes are all good reasons to apply supervised or self-supervised learning. \cite{JYu, XXin, Matuszyk}
+
+The difficulty of the project stems from the machine learning side of the problem. Because common approaches for recommendation systems require immense amounts of user data and interconnected user profiles, they are not practical for the scope of this project. Instead, transforming the recommendation problem into a supervised learning problem allows me the opportunity to practice real-world machine learning. Deciding which dataset I can use to provide ground-truth labels for recommendation is good practice, because real-world applications of ML often require extracting and preprocessing data from different sources. After obtaining the data, practicing iterative ML algorithm improvement - specifically identifying breakpoints and making changes to the algorithm to test out new hypotheses - has helped me gain a better perspective of how ML works.
 
 \section{Technical Background}
+Current approaches to recommendation use two main strategies, collaborative filtering and content-based recommendations.
+Collaborative filtering takes the similarity of other users
+into account when linking together products and making
+recommendations. For example, consider a user who enjoys playing Super Mario Bros. Collaborative filtering examines other users who also enjoy Super Mario Bros and
+recommends their enjoyed entries back to the initial user.
+This approach is frequently used in larger databases with
+data-dense entries. Even though collaborative
+filtering can provide another dimension to recommendation
+than just looking at product similarity, it fundamentally requires a sense of trust that other users can and will provide
+effective suggestions. This limitation is addressed in models that improve on benchmark collaborative filtering.
+
+% cite Anthony Chow
+        %Hdioud Ferdaous
+        %Javier Perez-Marcos
+        % Gohari for trust
+
+By contrast, content-based recommendations examine
+how different entities which are recommended can connect
+together. These recommendations put products together in
+semantic ways to test for similarity. One approach
+involves converting string queries (e.g., game titles like "Breakout" or "Tetris") or string content (game descriptions, reviews, and other corpora) into numerical vectors and comparing their contents to vectors of related games. The TF-IDF algorithm uses sparse numerical vectors (meaning that most vector elements are 0) to identify common keywords and penalize non-informatic keywords, and approaches that use it aim to find patterns of highly informatic, low-density word usage. \cite{Meidl, Zhang, DWang} Similarly, word embedding approaches such as Word2Vec \cite{Word2Vec} or the Google Universal Sentence Encoder \cite{SentenceEncoder} use dense vectors (with mostly non-zero vector elements) to compare similarity.
+
+FIXME Supervised learning and ML paragraph
 
 %This section introduces the technical knowledge necessary to understand your project, including any terminology and algorithms.
 %You should assume that the reader is a CS undergraduate like yourself, but not necessarily familiar with AI/ML/HCI/apps/video games/etc.
@@ -64,6 +99,18 @@
         Collaborative filtering
         Some RS applying both / extension of work (e.g., ant colony optimization paper?)
 
+        Content based via TF-IDF - examine comps proposal
+
+        Meidl/Lytinen - cited
+
+        Vu/Bezemer - cited
+
+        CF
+
+        Anthony Chow - cited
+        Hdioud Ferdaous - cited
+        Javier Perez-Marcos - cited
+
     Supervised ML.
         Machine learning
         Supervised learning
@@ -73,8 +120,7 @@
             Dimensionality reduction
             
     Relevant NLP content
-        TF-IDF
-        Word embeddings
+        Word embeddings - 
 \end{comment}
 
 \section{Prior Work}
@@ -88,24 +134,25 @@
 
         Collaborative filtering - Quantic Foundry, Steam Recommender
 
-        TODO find papers about Spotify and Netflix using CF
+        cite Quantic Foundry, Steam Recommender
 
     Papers.
 
         Collaborative filtering
+
+            Given user profiles on Steam (purchase histories and item descriptions), predict future purchases
             Choi et al. https://library.ucsd.edu/dc/object/bb5021836n/_3_1.pdf
 
-            Okon et al. https://www.researchgate.net/profile/Emmanuel-Okon/publication/324897120_An_Improved_Online_Book_Recommender_System_using_Collaborative_Filtering_Algorithm/links/5b25ee34a6fdcc697469689a/An-Improved-Online-Book-Recommender-System-using-Collaborative-Filtering-Algorithm.pdf
-
-            Gohari et al. - CF + trust https://link.springer.com/article/10.1007/s10489-016-0830-y
+            Gohari et al. - CF + trust to alleviate cold start issue 
+            https://link.springer.com/article/10.1007/s10489-016-0830-y
 
         Content based
 
+            semantic relatedness of games to match games across different contexts
             Ryan et al. https://eis.ucsc.edu/papers/ryanEtAl_PeopleTendToLikeRelatedGames.pdf
 
+            game similarity via cosine similarity to offset popularity bias            
             Vu and Bezemer - https://asgaard.ece.ualberta.ca/wp-content/uploads/2021/04/quang_fdg2021.pdf
-
-            Wang et al. https://www.sciencedirect.com/science/article/pii/S0950705118302107
 
         Combination of above two methods
 
@@ -115,8 +162,14 @@
 
             ML in RS
 
+                Recommender systems can scrape immense amounts of data from user profiles. How to navigate and assess such voluminous data found from user profiles (CF, etc.)? Use machine learning.
+
+                Given a MovieLens dataset, use a variety of ML approaches (supervised, unsupervised, reinforcement learning, etc.) to cluster together related movies
+
                 Nawrocka et al. https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8399650&tag=1
 
+
+                Input: user history of watch data -> SVM -> output: prediction of TV show, specifically using SVM and comparing kernel outputs
                 Xu and Araki - SVM for personalized recommendations - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=1651358
 
                 Using recommendation for sentiment analysis via ML. Anqi Zhang - https://openprairie.sdstate.edu/cgi/viewcontent.cgi?article=1487&context=etd2
@@ -128,24 +181,47 @@
             NLP in RS
             TODO search "nlp for recommender system"
 
+
+                Berbatova focuses on NLP techniques for Content-based RS for books
+                
+                Content-based RS use ML (Naive Bayes, SVM, and KNN) - very high dimensional data coming from vector representation requires NLP to smooth out
+
+                Extract additional features from natural language data
+
+                AND big takeaway - think of recommendation as classification task
+
                 Berbatova - https://aclanthology.org/R19-2009.pdf
 
+                Instead of focusing purely on NLP metrics, think about bigger picture of providing various news sources to support democracy. Can provide similar approach to recommendation (ultimate result is to give product - NLP is a means to do that)
+
                 Reuver et al. - https://aclanthology.org/2021.hackashop-1.7.pdf
+
+                Cluster together people's food preferences from comments and make restaurant suggestions based on that - semantic clustering from natural language and extraction of key topics
 
                 Asani et al. - https://www.sciencedirect.com/science/article/pii/S2666827021000578 (sentiment analysis)
 
             "word embeddings recommender system"
 
+            (good paper - look into more)
+
+            To help with cold start problem, combine collaborative filtering with word embedding content analysis; express contents of vectors as embeddings of titles, genres, actors, plots
+
+            "The main aim of this paper is to understandthe content of the movie plot using a word embedding to improve the measurementof similarity of each plot content to other plot content (called plot embedding"
+
+            Luong Vuong Nguyen
+            Tri-Hai Nguyen
+            Jason J. Jung
+            David Camacho
+
             Nguyen et al. - https://onlinelibrary.wiley.com/doi/pdf/10.1002/cpe.6232
 
+            Use contextual information to improve RS accuracy. Propose new context-aware RS extracting context from reviews using a word embedding model - use this in addition to user profiles to get context sensitivity, tested on Yelp dataset
+
+            (good paper - look into more)
+
+            Sundermann et al.
             https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8609619
 
-            tf-idf prior work
-
-            Meidl, Zhang, Wang
-
-            Wang paper: https://www.sciencedirect.com/science/article/pii/S0950705118302107
-    
     
 \end{comment}
 
@@ -268,8 +344,16 @@
     ____
     
     
-    FIXME find literature that uses standard ML metrics
+    TODO cite and apply literature that uses standard ML metrics to justify their use
 
+    Nosayba Al-Azzam and Ibrahem Shatnawi Ph.D, PE, PMP, PTOE https://www.sciencedirect.com/science/article/pii/S2049080120305604
+
+    Shovan Chowdhury and Marco P. Schoen https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=9249211
+
+    P. Sujatha and K. Mahalakshmi
+    https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=9298354
+    
+    
     - Standard ML metrics 
         Precision
         recall
@@ -323,6 +407,8 @@
     Results also meet the goals of the project. Given a query game g and a potential recommendation r, the SVM outputs either a 0 (don't recommend) or a 1 (do recommend)
 
     Limitations include emphasis on word embeddings to train SVM algorithm. So, future work can include using NLP approaches like sentiment analysis, dependency parsing, etc. in order to further pinpoint game relatedness
+
+    FIXME figure out how to put citations here
     
 \end{comment}
 
@@ -382,6 +468,12 @@ org / index . php / AAAI / article / view /
     Future work can involve training the model beyond word embeddings so that it can capture similar qualitative aspects of the game. (this improves recall)
 
     So, future work can include using NLP approaches like sentiment analysis, dependency parsing, etc. in order to further pinpoint game relatedness
+
+    Sentiment analysis - https://www.sciencedirect.com/science/article/abs/pii/S0920548912001237
+
+    Dependency parsing - An Intelligent Data Analysis for Recommendation Systems Using Machine Learning
+
+    https://www.hindawi.com/journals/sp/2019/5941096/
 
     Future work if more time was involved could include scraping review content from average players (from forums, Google reviews, etc.)
 
