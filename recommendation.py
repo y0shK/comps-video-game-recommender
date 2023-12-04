@@ -22,7 +22,7 @@ from sklearn.decomposition import PCA
 from imblearn.over_sampling import SMOTE
 from collections import Counter
 
-from get_api_info import get_giantbomb_game_info, get_gamespot_games, get_similar_games
+from get_api_info import get_giantbomb_game_info, get_associated_review, get_gamespot_games, get_similar_games
 from process_recs import process_text, check_valid_deck_and_desc, return_valid_review, get_embedding, check_valid_demographics
 from testcases import run_testcase
 from visuals import update_demographic_dict, create_histogram
@@ -41,6 +41,27 @@ GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 # then use metacritic_game_user_comments.csv to get reviews for each game
 csv_titles_df = pd.read_csv("metacritic_game_info.csv")
 csv_reviews_df = pd.read_csv("metacritic_game_user_comments.csv")
+
+#"""
+
+#squery = "Sekiro: Shadows Die Twice"
+#squery = "Super Mario 64"
+squeries = ['Breakout', 'Tetris', "Sid Meier's Civilization V", 'Pong', 'Pacman', 'Team Fortress 2', 'Lego Star Wars']
+for squery in squeries:
+    sample_dict = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=squery, headers=HEADERS,session=session)
+    print("check squery")
+    #pdb.set_trace()
+
+    if squery in sample_dict.keys():
+        sguid = sample_dict[squery]['guid']
+
+    sreview = get_associated_review(api_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session, query_dict=sample_dict)
+    print("sreview")
+    pdb.set_trace()
+
+
+#"""
+
 
 """
 1. Form a query set by combining games from metacritic csv and GameSpot API
