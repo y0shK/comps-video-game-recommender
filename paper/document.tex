@@ -77,6 +77,7 @@ filtering can provide another dimension to recommendation
 than just looking at product similarity, it fundamentally requires a sense of trust that other users can and will provide
 effective suggestions. This limitation is addressed in models that improve on benchmark collaborative filtering.
 
+% for collaborative filtering, cite:
 % cite Anthony Chow
         %Hdioud Ferdaous
         %Javier Perez-Marcos
@@ -89,6 +90,11 @@ semantic ways to test for similarity. One approach
 involves converting string queries (e.g., game titles like "Breakout" or "Tetris") or string content (game descriptions, reviews, and other corpora) into numerical vectors and comparing their contents to vectors of related games. The TF-IDF algorithm uses sparse numerical vectors (meaning that most vector elements are 0) to identify common keywords and penalize non-informatic keywords, and approaches that use it aim to find patterns of highly informatic, low-density word usage. \cite{Meidl, Zhang, DWang} Similarly, word embedding approaches such as Word2Vec \cite{Word2Vec} or the Google Universal Sentence Encoder \cite{SentenceEncoder} use dense vectors (with mostly non-zero vector elements) to compare similarity.
 
 FIXME Supervised learning and ML paragraph
+
+% for ML
+% cite SMOTE - cited
+% cite SVM https://link.springer.com/content/pdf/10.1007/bf00994018.pdf - cited
+
 
 %This section introduces the technical knowledge necessary to understand your project, including any terminology and algorithms.
 %You should assume that the reader is a CS undergraduate like yourself, but not necessarily familiar with AI/ML/HCI/apps/video games/etc.
@@ -115,12 +121,37 @@ FIXME Supervised learning and ML paragraph
         Machine learning
         Supervised learning
             synthetic minority oversampling
+
+            SMOTE - cited
+
         SVM algorithm
-            Relevant processes for SVM output
-            Dimensionality reduction
+            Separating decision boundary to maximize points' distance from margin
+            SVM combines optimal margin classification with kernel trick (teaches classifier how to map to nonlinear decision boundaries)
+            Kernel trick by mathematical definition helps work with high-dimension inputs, making SVM particularly helpful for high-dimensional spaces like word embedding inputs
+
+            SVM - cited
             
-    Relevant NLP content
-        Word embeddings - 
+            Dimensionality reduction - principal component analysis. Identifies hyperplane, project onto 2d Slice for visualization (center the dataset and minimize projection distance)
+            Why use? Reduce dimensionality to visualize and gain intuition (plus runs faster - more compressed)
+            
+    Relevant NLP content (word embeddings)
+
+        Ryan: - cited
+        Using NLP (specifically latent semantic analysis). Find most informatic words and conduct LSA on high-dimensional data on Wikipedia articles of digital games. Also use to make a tool for future game researchers
+        https://users.soe.ucsc.edu/~jor/publications/ryanGamesStudiesUsingNLP.pdf
+        
+
+        Sundermann: - cited
+
+        Use contextual information in addition to conventional aspects of user profiles and content-based filtering. context of items (products) and reviews using text mining/word embedding representations
+
+        Proposes contextual information extraction tool from documents of product info/recommendations
+
+        Nguyen: - cited
+
+        Help alleviate the cold start problem by using word embedding content analysis of free-text input in conjunction with collaborative filtering; perform topic modeling using word embedding representations and use topics for cosine similarity recommendation
+    
+        Word embeddings - Sundermann et al. and Nguyen et al.
 \end{comment}
 
 \section{Prior Work}
@@ -134,29 +165,29 @@ FIXME Supervised learning and ML paragraph
 
         Collaborative filtering - Quantic Foundry, Steam Recommender
 
-        cite Quantic Foundry, Steam Recommender
+        cite Quantic Foundry, Steam Recommender - cited
 
     Papers.
 
         Collaborative filtering
 
             Given user profiles on Steam (purchase histories and item descriptions), predict future purchases
-            Choi et al. https://library.ucsd.edu/dc/object/bb5021836n/_3_1.pdf
+            Choi et al. https://library.ucsd.edu/dc/object/bb5021836n/_3_1.pdf - cited
 
             Gohari et al. - CF + trust to alleviate cold start issue 
-            https://link.springer.com/article/10.1007/s10489-016-0830-y
+            https://link.springer.com/article/10.1007/s10489-016-0830-y - cited
 
         Content based
 
             semantic relatedness of games to match games across different contexts
-            Ryan et al. https://eis.ucsc.edu/papers/ryanEtAl_PeopleTendToLikeRelatedGames.pdf
+            Ryan et al. https://eis.ucsc.edu/papers/ryanEtAl_PeopleTendToLikeRelatedGames.pdf - cited
 
             game similarity via cosine similarity to offset popularity bias            
-            Vu and Bezemer - https://asgaard.ece.ualberta.ca/wp-content/uploads/2021/04/quang_fdg2021.pdf
+            Vu and Bezemer - https://asgaard.ece.ualberta.ca/wp-content/uploads/2021/04/quang_fdg2021.pdf - cited
 
         Combination of above two methods
 
-            Perez-Marcos et al. https://link.springer.com/article/10.1007/s12652-020-01681-0
+            Perez-Marcos et al. https://link.springer.com/article/10.1007/s12652-020-01681-0 - cited
 
         Supervised ML and its role in recommendation
 
@@ -164,19 +195,20 @@ FIXME Supervised learning and ML paragraph
 
                 Recommender systems can scrape immense amounts of data from user profiles. How to navigate and assess such voluminous data found from user profiles (CF, etc.)? Use machine learning.
 
-                Given a MovieLens dataset, use a variety of ML approaches (supervised, unsupervised, reinforcement learning, etc.) to cluster together related movies
+                Given a MovieLens dataset, use a variety of ML approaches (supervised, unsupervised, reinforcement learning, etc.) to cluster together related movies and compare relative performances (mean absolute error, RMSE, etc.) - cited
 
-                Nawrocka et al. https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8399650&tag=1
-
+                Nawrocka et al. https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8399650&tag=1 - cited
 
                 Input: user history of watch data -> SVM -> output: prediction of TV show, specifically using SVM and comparing kernel outputs
-                Xu and Araki - SVM for personalized recommendations - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=1651358
+                Xu and Araki - SVM for personalized recommendations - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=1651358 - cited
 
-                Using recommendation for sentiment analysis via ML. Anqi Zhang - https://openprairie.sdstate.edu/cgi/viewcontent.cgi?article=1487&context=etd2
+                Using recommendation for sentiment analysis via ML. Anqi Zhang - https://openprairie.sdstate.edu/cgi/viewcontent.cgi?article=1487&context=etd2 - cited
 
-                Examination of game reviews for game recs
+                Examination of free-text game reviews for game recs and clusters together adjectives to context as word pairs. Frequency of pairs forms features. Given a number of intro "seed" games the user likes, find games similar to the seeds given clusters of word pairs (cosine similarity)
                 Meidl and Lytinen - https://ojs.aaai.org/index.php/AIIDE/article/view/12752/12600
-                (read this more closely)
+                - cited
+
+                TODO consider adjective-context word pairs as part of further analysis (check Meidl/Lytinen)
 
             NLP in RS
             TODO search "nlp for recommender system"
@@ -190,11 +222,11 @@ FIXME Supervised learning and ML paragraph
 
                 AND big takeaway - think of recommendation as classification task
 
-                Berbatova - https://aclanthology.org/R19-2009.pdf
+                Berbatova - https://aclanthology.org/R19-2009.pdf - cited
 
                 Instead of focusing purely on NLP metrics, think about bigger picture of providing various news sources to support democracy. Can provide similar approach to recommendation (ultimate result is to give product - NLP is a means to do that)
 
-                Reuver et al. - https://aclanthology.org/2021.hackashop-1.7.pdf
+                Reuver et al. - https://aclanthology.org/2021.hackashop-1.7.pdf - cited
 
                 Cluster together people's food preferences from comments and make restaurant suggestions based on that - semantic clustering from natural language and extraction of key topics
 
@@ -202,25 +234,17 @@ FIXME Supervised learning and ML paragraph
 
             "word embeddings recommender system"
 
-            (good paper - look into more)
-
+            
             To help with cold start problem, combine collaborative filtering with word embedding content analysis; express contents of vectors as embeddings of titles, genres, actors, plots
 
             "The main aim of this paper is to understandthe content of the movie plot using a word embedding to improve the measurementof similarity of each plot content to other plot content (called plot embedding"
 
-            Luong Vuong Nguyen
-            Tri-Hai Nguyen
-            Jason J. Jung
-            David Camacho
-
-            Nguyen et al. - https://onlinelibrary.wiley.com/doi/pdf/10.1002/cpe.6232
+            Nguyen et al. - https://onlinelibrary.wiley.com/doi/pdf/10.1002/cpe.6232 - cited
 
             Use contextual information to improve RS accuracy. Propose new context-aware RS extracting context from reviews using a word embedding model - use this in addition to user profiles to get context sensitivity, tested on Yelp dataset
 
-            (good paper - look into more)
-
             Sundermann et al.
-            https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8609619
+            https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=8609619 - cited
 
     
 \end{comment}
@@ -258,17 +282,16 @@ FIXME Supervised learning and ML paragraph
     - Preprocessing.
 
     synthetic minority oversampling - there is a class imbalance (many more 0s than 1s). So, perform SMOTE to generate close points in N-space to balance out the classes for binary classification 
-
-    FIXME Cite literature for SMOTE
-    https://www.jair.org/index.php/jair/article/view/10302
     
 
     Dimensionality reduction. Since word embedding vectors can't be visualized, use principal component analysis to project the word embedding vectors into a 2D space, which allows us to conceptually understand
 
-    FIXME Cite literature for dimensionality reduction
-
     - Algorithm.
 
+    Cite SVM paper - Vladimir Vapnik/Corinna Cortes
+
+    Cite for dimensionality reduction - 
+    
     SVM is used because it scales well to high dimensional data ("One remarkable property of SVMs is that their ability to learn can be independent of the dimensionality of the feature space.") Joachims https://wiki.eecs.yorku.ca/course_archive/2013-14/W/6339/_media/joachims_98a.pdf
 
     Why is SVM used instead of other supervised learning algorithms?
@@ -334,14 +357,9 @@ FIXME Supervised learning and ML paragraph
     
     https://dl.acm.org/doi/10.1145/1864708.1864721
 
-    ____
     See this literature:
 
     https://dl.acm.org/doi/abs/10.1145/1328854.1328855 - "cosine similarity has proven to be a robust metric for scoring the similarity between two strings, and it is increasingly being used in complex queries" - database management but NOT natural language processing
-
-    FIXME check if https://ieeexplore.ieee.org/abstract/document/7349760 uses cosine similarity effectively in a way that is not relevant for my use caese
-
-    ____
     
     
     TODO cite and apply literature that uses standard ML metrics to justify their use
@@ -402,13 +420,15 @@ FIXME Supervised learning and ML paragraph
 
     It is also possible that natural language processing input to algorithm automatically reduces recall. Even if two games have the exact same demographic characteristics (genre, theme, franchise), if the way in which their deck/description are framed is sufficiently different, the model will take that into consideration. For example, consider recommending given the first Super Mario Bros game given the original Donkey Kong arcade game. The genre (platformer) and franchise (Mario) are the same, but the descriptions may very significantly ("arcade machine" vs. "blockbuster home console video game"). In this way, an algorithm trained on word embeddings will miss what is otherwise an accurate recommendation. Future work can involve training the model beyond word embeddings so that it can capture similar qualitative aspects of the game. (this improves recall)
 
-    On the other hand, it is also possible that further NLP approaches like sentiment analysis would also improve accuracy. By the same token, it is possible that two games have no demographic in common (different genre, theme, and franchise) but have similar text describing them. For instance, "groundbreaking 3D graphics" could describe Super Mario 64 or Gran Turismo - without context, both of those statements could be true. Considering NLP methods like dependency parsing or sentiment analysis in this case is a potential way to contextualize text so that mixups across demographics are less frequent. (this improves precision)
+    On the other hand, it is also possible that further NLP approaches like sentiment analysis would also improve accuracy. By the same token, it is possible that two games have no demographic in common (different genre, theme, and franchise) but have similar text describing them. For instance, "groundbreaking 3D graphics" could describe Super Mario 64 or Gran Turismo - without context, both of those statements could be true. Considering NLP methods like dependency parsing or sentiment analysis in this case is a potential way to contextualize text so that mixups across demographics are less frequent. (this improves precision) 
+
+    Cite Ryan - people tend to like related games
+    https://eis.ucsc.edu/papers/ryanEtAl_PeopleTendToLikeRelatedGames.pdf
 
     Results also meet the goals of the project. Given a query game g and a potential recommendation r, the SVM outputs either a 0 (don't recommend) or a 1 (do recommend)
 
     Limitations include emphasis on word embeddings to train SVM algorithm. So, future work can include using NLP approaches like sentiment analysis, dependency parsing, etc. in order to further pinpoint game relatedness
 
-    FIXME figure out how to put citations here
     
 \end{comment}
 
@@ -466,6 +486,8 @@ org / index . php / AAAI / article / view /
 \begin{comment}
 
     Future work can involve training the model beyond word embeddings so that it can capture similar qualitative aspects of the game. (this improves recall)
+
+    FIXME finish citations
 
     So, future work can include using NLP approaches like sentiment analysis, dependency parsing, etc. in order to further pinpoint game relatedness
 
