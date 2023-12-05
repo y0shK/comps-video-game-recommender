@@ -22,7 +22,7 @@ Arguments:
     offset (int): how many pages API should skip before sending new content in response
     session (CachedSession): optional session to store results in local cache
 Returns: game_data (dict): key=name and value=
-    id, name, deck, description, genres, themes, franchises, recommend_boolean == 0
+    id, name, deck, description, genres, themes, franchises
 """
 def get_gamespot_game_info(api_key, headers, offset, session=my_session):
     game_data = {}
@@ -70,7 +70,7 @@ Arguments:
     headers (string): specify User-Agent field
     game_count (int): how many pages desired (roughly 100 games per page)
 Returns:
-    games (dict): {k: game name, v: {game properties, recommend_boolean == 0}}
+    games (dict): {k: game name, v: {game properties}}
 """
 def get_gamespot_games(api_key, headers, game_count=10, session=my_session):
     # https://stackoverflow.com/questions/38987/how-do-i-merge-two-dictionaries-in-a-single-expression-in-python
@@ -252,72 +252,19 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
     return query_game_dict
 
 """
-get_associated_review
-Given a GiantBomb query game dictionary, provide the associated review if possible, else provide null element
+get_gamespot_reviews
+Get reviews from GameSpot games
 Arguments: 
-    api_key (string): API key for GiantBomb
+    api_key (string): API key for GameSpot
     headers (string): specify User-Agent field
     session (CachedSession): optional session to store results in local cache
-    query_dict (dict): GiantBomb game dict object obtained from get_giantbomb_game_info()
 Returns:
-    review (str): return associated review obtained from API call
+    review_data (dict): key=name and value=
+    id, name, deck, description, genres, themes, franchises
 """
 def get_associated_review(api_key, headers, session, query_dict):
-    name = list(query_dict.keys())[0]
-
-    if query_dict[name] and 'guid' in query_dict[name].keys():
-        guid = query_dict[name]['guid']
-    else:
-        guid = ''
-
-    if guid == '':
-        print("empty guid")
-        return ''
-
-    review_url = "https://www.giantbomb.com/api/game/" + guid + "/?api_key=" + api_key + "&format=json"
-    review_resp = session.get(review_url, headers=headers)
-
-    try:
-        review_json = json.loads(review_resp.text)
-    except ValueError:
-        print("ValueError")
-        return ''
+    pass # FIXME grab reviews from GameSpot - implement or delete later as needed
     
-    review_api_results = review_json['results']
-
-    pdb.set_trace()
-
-    if review_api_results == []:
-        print("empty API results")
-        return ''
-    
-    if 'reviews' not in review_api_results.keys():
-        return ''
-
-    # else, there is a valid review
-
-    # DOESN'T WORK - TRY OTHER
-    print("get review detail URL")
-    pdb.set_trace()
-
-    review_guid = review_api_results['api_detail_url'][35:45]
-    #review_detail_url = "https://www.giantbomb.com/api/review/" + review_guid + "/?api_key=" + api_key + "&format=json"
-
-    review_detail_url = "https://www.giantbomb.com/api/reviews/?api_key=" + api_key + "&format=json&filter=game:" + name
-
-    review_detail_resp = session.get(review_detail_url, headers=headers)
-
-    try:
-        review_detail_json = json.loads(review_detail_resp.text)
-    except ValueError:
-        print("ValueError")
-        return ''
-
-    print("check review_detail_json")
-    pdb.set_trace()
-
-    return review_api_results['reviews']
-
 
 
 

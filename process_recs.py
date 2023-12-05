@@ -2,10 +2,13 @@
 Process aspects of recommendation to feed into algorithm
 """
 from nltk.tokenize import RegexpTokenizer
+from nltk import word_tokenize
 from nltk.corpus import stopwords
-import tensorflow as tf
-from sklearn.metrics.pairwise import cosine_similarity
+import string
 
+#https://stackoverflow.com/questions/52688019/how-do-i-download-en-for-spacy-using-conda
+import spacy
+import tensorflow as tf
 import numpy as np
 
 tokenizer = RegexpTokenizer(r'\w+')
@@ -115,40 +118,78 @@ def check_for_valid_qualities(name, deck, desc, genres, themes, franchises):
     return valid_dict
 
 """
-get_embedding_similarity
-Given an instance of TensorFlow Universal Encoder model, 
-calculate cosine similarity between two (tokenized and preprocessed) sentence embeddings
-Arguments: tfm (encoder model),
-            l1 (list of strings): tokenized string to embed (from outer loop)
-            l2 (list of strings): tokenized string to embed (from inner loop)
-Returns: cos_sim (float): float between 0 and 1
-"""
-def get_embedding_similarity(tfm, l1, l2):
-
-    str1 = " ".join(l1)
-    str2 = " ".join(l2)
-
-    embed1 = tfm([str1])
-    embed2 = tfm([str2])
-    
-    norm1 = tf.nn.l2_normalize(embed1, axis=1)
-    norm2 = tf.nn.l2_normalize(embed2, axis=1)
-
-    # cosine_similarity(norm1, norm2) returns [[float]]
-    return abs(cosine_similarity(norm1, norm2)[0][0])
-
-"""
 get_embedding
 Given an instance of TensorFlow Universal Encoder model, 
-obtain numpy array value of (tokenized and preprocessed) sentence embedding
+obtain numpy array value of sentence embedding.
+Provide tokenized string to embed
 Arguments: tfm (encoder model),
-            li (list of strings): tokenized string to embed
+            li (list of strings): tokenized string to embed - defaults to Falsy value
 Returns: np_embed (numpy array): word embedding in np.array form
 """
-def get_embedding(tfm, li):
-    str1 = " ".join(li)
-    embed1 = tfm([str1])
+def get_embedding(tfm, li=[]):
+    if li: # use tokenized string
+        str1 = " ".join(li)
+        embed1 = tfm([str1])
+    else:
+        return []
+    
     norm1 = tf.nn.l2_normalize(embed1, axis=1)
     np_embed = np.array(norm1[0])
 
     return np_embed
+
+"""
+preprocess_review
+Given a free-text review r, word tokenize it, remove stopwords, remove punctuation.
+Return stitched-together string with non-informatic words (articles, punctuation, etc.) removed
+Arguments:
+    review (str): free-text review for a game g
+Returns:
+    stitched_review (str): preprocessed review for game g
+"""
+def preprocess_review(review):
+    wt = word_tokenize(review)
+    wt = [w.lower() for w in wt if w not in stops and w not in string.punctuation]
+
+    stitched_review = " ".join(wt)
+    return stitched_review
+
+"""
+get_adjective_context_pairs
+Given a preprocessed review pr, get adjective-context pairs (adj + noun) from pr as a list of tokenized strings
+Arguments:
+    spacy_core (spacy core): define English spacy pipeline for adjective pairs
+    pr (str): preprocessed free-text review for a game g
+Returns:
+    adj_noun_pairs (list): a list of strings containing adj + noun pairs
+Example run:
+    "Favorite game time dazzling..." -> function -> ['amazing atmosphere', 'enjoyable combat', ...]
+"""
+def get_adjective_context_pairs(en_nlp, pr, upper_limit=1000000): # can extend en_nlp.max_length if needed)
+    doc_pr = en_nlp(pr[0:upper_limit]) # <class 'spacy.tokens.doc.Doc'>
+
+    # get noun chunks from spacy doc, then tie adjectives to noun contexts
+    pr_noun_chunks = doc_pr.noun_chunks
+    chunk_contexts = []
+    adj_noun_pairs = []
+
+    # https://stackoverflow.com/questions/67821137/spacy-how-to-get-all-words-that-describe-a-noun
+    for chunk in pr_noun_chunks:
+        out_dict = {}
+        noun = chunk.root
+        if noun.pos_ != 'NOUN':
+            continue
+        out_dict['noun'] = noun
+        for tok in chunk:
+            if tok != noun:
+                pos_str = str(tok.pos_).lower()
+                out_dict[pos_str] = tok
+        chunk_contexts.append(out_dict)
+
+    # now tie together words
+    for context in chunk_contexts:
+        if 'noun' in context.keys() and 'adj' in context.keys():
+            phrase = str(context['adj']).lower() + " " + str(context['noun']).lower()
+            adj_noun_pairs.append(phrase)
+
+    return adj_noun_pairs

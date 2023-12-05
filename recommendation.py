@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import random
+import spacy
+from spacy.cli import download
 
 import tensorflow_hub as hub
 from sklearn.svm import SVC
@@ -23,7 +25,7 @@ from imblearn.over_sampling import SMOTE
 from collections import Counter
 
 from get_api_info import get_giantbomb_game_info, get_associated_review, get_gamespot_games, get_similar_games
-from process_recs import process_text, check_valid_deck_and_desc, return_valid_review, get_embedding, check_valid_demographics
+from process_recs import process_text, check_valid_deck_and_desc, return_valid_review, get_embedding, check_valid_demographics, preprocess_review, get_adjective_context_pairs
 from testcases import run_testcase
 from visuals import update_demographic_dict, create_histogram
 
@@ -42,32 +44,28 @@ GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 csv_titles_df = pd.read_csv("metacritic_game_info.csv")
 csv_reviews_df = pd.read_csv("metacritic_game_user_comments.csv")
 
-#"""
 
-#squery = "Sekiro: Shadows Die Twice"
-#squery = "Super Mario 64"
-squeries = ['Breakout', 'Tetris', "Sid Meier's Civilization V", 'Pong', 'Pacman', 'Team Fortress 2', 'Lego Star Wars']
-for squery in squeries:
-    sample_dict = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=squery, headers=HEADERS,session=session)
-    print("check squery")
-    #pdb.set_trace()
+# test spacy
+print("Loading in spacy web model")
+#en_nlp = en_core_web_sm.load()
 
-    if squery in sample_dict.keys():
-        sguid = sample_dict[squery]['guid']
-
-    sreview = get_associated_review(api_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session, query_dict=sample_dict)
-    print("sreview")
-    pdb.set_trace()
+#pdb.set_trace()
+download("en_core_web_sm")
+en_nlp = spacy.load("en_core_web_sm")
+#en_nlp = spacy.load('en_core_web_lg')
 
 
-#"""
+pdb.set_trace()
+testrev = "dazzling locations bright visuals generally flexible forgiving gameplay"
+print(get_adjective_context_pairs(en_nlp, testrev))
 
+pdb.set_trace()
 
 """
 1. Form a query set by combining games from metacritic csv and GameSpot API
 Get titles from each of the data sources, then get information from API calls
 """
-csv_titles = list(set([i for i in csv_titles_df['Title']][0:40])) # 30 games
+csv_titles = list(set([i for i in csv_titles_df['Title']][0:5]))
 
 #print(list(set([i for i in csv_reviews_df['Title']])))
 #pdb.set_trace()
@@ -133,6 +131,7 @@ print("Length of dataset:")
 print(len(query_set))
 
 game_counter = 1
+review_len_limit = 5
 
 for k, v in query_set.items():
 
@@ -166,8 +165,17 @@ for k, v in query_set.items():
 
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
+
+        # if review exists, find its adjective-context pairs (adj, then noun)
+        # feed those in as review features to word embedding representation
+        if sv['review']:
+            preprocessed = preprocess_review(sv['review'])
+            adj_noun_pairs = get_adjective_context_pairs(en_nlp, preprocessed, upper_limit=review_len_limit)
+        else:
+            adj_noun_pairs = []
+
         tokenized_review = return_valid_review(sv['review'])
-        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review
+        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review + adj_noun_pairs
         word_embedding = get_embedding(model, tokenized_list)
 
         X.append(word_embedding)
@@ -212,10 +220,18 @@ for k, v in query_set.items():
         known_theme = check_valid_demographics(nv['themes'])
         known_franchise = check_valid_demographics(nv['franchises'])
 
+        # if review exists, find its adjective-context pairs (adj, then noun)
+        # feed those in as review features to word embedding representation
+        if nv['review']:
+            preprocessed = preprocess_review(nv['review'])
+            adj_noun_pairs = get_adjective_context_pairs(en_nlp, preprocessed, upper_limit=review_len_limit)
+        else:
+            adj_noun_pairs = []
+
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
         tokenized_review = return_valid_review(sv['review'])
-        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review
+        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review + adj_noun_pairs
         word_embedding = get_embedding(model, tokenized_list)
 
         X.append(word_embedding)
@@ -370,13 +386,13 @@ run_testcase(query='Breakout', rec="Baldur's Gate", model=model, clf=clf, gamesp
 run_testcase(query='Super Mario Bros', rec="The Great Giana Sisters", model=model, clf=clf, \
              gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 1 - received 0
+# expected 1 - received 1
 run_testcase(query="The Legend of Zelda: Breath of the Wild", rec="Horizon Zero Dawn", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
 # expected 0 - received 1
 run_testcase(query="The Legend of Zelda: Breath of the Wild", rec="Sid Meier's Civilization V", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 1 - received 1
+# expected 1 - received 0
 run_testcase(query="Super Mario Galaxy 2", rec="Banjo-Tooie", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
 # expected 0 - received 1
