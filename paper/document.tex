@@ -355,20 +355,43 @@ FIXME Supervised learning and ML paragraph
 
     Novelty, serendipity, etc. These are valuable when the evaluation concerns value of product (e.g., would user like the recommended game/movie/app etc.) Instead, my project is focused on maximizing TP and TN, which is a purely numerical metric independent of user input
     
-    https://dl.acm.org/doi/10.1145/1864708.1864721
+    https://dl.acm.org/doi/10.1145/1864708.1864721 - cited
 
     See this literature:
 
-    https://dl.acm.org/doi/abs/10.1145/1328854.1328855 - "cosine similarity has proven to be a robust metric for scoring the similarity between two strings, and it is increasingly being used in complex queries" - database management but NOT natural language processing
+    https://dl.acm.org/doi/abs/10.1145/1328854.1328855 - "cosine similarity has proven to be a robust metric for scoring the similarity between two strings, and it is increasingly being used in complex queries" - database management but NOT natural language processing - cited
+
+    precision, recall, F-1 score
+
+    Nosayba Al-Azzam and Ibrahem Shatnawi Ph.D, PE, PMP, PTOE https://www.sciencedirect.com/science/article/pii/S2049080120305604 - cited
+
+    Shovan Chowdhury and Marco P. Schoen - cited
+    Research Paper Classification using Supervised
+Machine Learning Techniques
+
+    use ML techniques to classify abstracts into science, business, social science categories (SVM, KNN, Naive Bayes, decision trees - F1 score from SVM from 0.85 to 0.92, KNN from 0.78 to 0.92, etc.
+    https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=9249211
+
+
     
+    P. Sujatha and K. Mahalakshmi - cited
+
+    "Decision Tree, Naïve
+Bayes, Random Forest, Support Vector Machine, K-Nearest
+Neighbor and logistic Regression algorithms. The performance
+of the algorithms was analyzed using parameters such as
+Accuracy, Precision, AUC and F1-score"
+
+    "From the
+experimental result, it is found that the Random Forest is more
+accurate for predicting the heart disease with accuracy of
+83.52% compared with other supervised machine learning
+algorithms. The F1- Score, AUC and precision score of
+Random forest classifiers are 84.21%, 88.24% and 88.89%
+respectively."
     
-    TODO cite and apply literature that uses standard ML metrics to justify their use
-
-    Nosayba Al-Azzam and Ibrahem Shatnawi Ph.D, PE, PMP, PTOE https://www.sciencedirect.com/science/article/pii/S2049080120305604
-
-    Shovan Chowdhury and Marco P. Schoen https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=9249211
-
-    P. Sujatha and K. Mahalakshmi
+    Performance Evaluation of Supervised Machine
+Learning Algorithms in Prediction of Heart Disease
     https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=9298354
     
     
@@ -423,7 +446,7 @@ FIXME Supervised learning and ML paragraph
     On the other hand, it is also possible that further NLP approaches like sentiment analysis would also improve accuracy. By the same token, it is possible that two games have no demographic in common (different genre, theme, and franchise) but have similar text describing them. For instance, "groundbreaking 3D graphics" could describe Super Mario 64 or Gran Turismo - without context, both of those statements could be true. Considering NLP methods like dependency parsing or sentiment analysis in this case is a potential way to contextualize text so that mixups across demographics are less frequent. (this improves precision) 
 
     Cite Ryan - people tend to like related games
-    https://eis.ucsc.edu/papers/ryanEtAl_PeopleTendToLikeRelatedGames.pdf
+    https://eis.ucsc.edu/papers/ryanEtAl_PeopleTendToLikeRelatedGames.pdf - cited
 
     Results also meet the goals of the project. Given a query game g and a potential recommendation r, the SVM outputs either a 0 (don't recommend) or a 1 (do recommend)
 
@@ -442,13 +465,6 @@ FIXME Supervised learning and ML paragraph
 
 \begin{comment}
     Data bias. Like any machine learning project, the model is only as good (or as biased) as the data which is put in. The model receives data from Metacritic, GameSpot, and GiantBomb APIs. This means that it receives text data from verified reviewers who have write access to those websites, but it will not get the perspective of the average video game player. In terms of perspectives represented, then, the model overrepresents the critical perspective and ignores the average players' thoughts.
-
-    FIXME cite Bertie Vidgen, Leon Derczynski. Directions in abu-
-sive language training data, a systematic review:
-Garbage in, garbage out. https://journals.
-plos . org / plosone / article ? id = 10 .
-1371 / journal . pone . 0243300 # sec030.
-Online; accessed 9 April 2023. 2020.
 
 While some abusive content in annotated
 datasets is openly hostile or inappropriate, ”edge cases”
@@ -470,13 +486,6 @@ any provided input string is not found within the hate speech
 dataset is one possible way to error check before the string
 is forwarded to the algorithm. 
 
-    FIXME add paper to citation
- Binny Mathew, Punyajoy Saha, Seid Muhie Yimam,
-Chris Biemann, Pawan Goyal, Animesh Mukherjee.
-HateXplain: A Benchmark Dataset for Explainable
-Hate Speech Detection. https : / / ojs . aaai .
-org / index . php / AAAI / article / view /
-17745. Online; accessed 12 April 2023.
 \end{comment}
 
 % The project is considered both in its complete technological and societal context. Issues of bias and diversity are explored in detail, and potential contributions to global and local inequity examined. Relevant literature is cited.
@@ -486,16 +495,19 @@ org / index . php / AAAI / article / view /
 \begin{comment}
 
     Future work can involve training the model beyond word embeddings so that it can capture similar qualitative aspects of the game. (this improves recall)
-
-    FIXME finish citations
-
+    
     So, future work can include using NLP approaches like sentiment analysis, dependency parsing, etc. in order to further pinpoint game relatedness
-
-    Sentiment analysis - https://www.sciencedirect.com/science/article/abs/pii/S0920548912001237
 
     Dependency parsing - An Intelligent Data Analysis for Recommendation Systems Using Machine Learning
 
-    https://www.hindawi.com/journals/sp/2019/5941096/
+    improve conventional collaborative filtering approach by using sentiment analysis on hotel reviews for feature extraction (polarity identification using syntax and semantic analysis), evaluated w/ precision, recall, and F-1
+
+    https://www.hindawi.com/journals/sp/2019/5941096/ - cited
+
+    Sentiment analysis - https://www.sciencedirect.com/science/article/abs/pii/S0920548912001237 - cited
+
+    Sentiment analysis algorithm that examines syntax-level relationships between words (via dependency parsing) in order to provide context for restaurant reviews
+
 
     Future work if more time was involved could include scraping review content from average players (from forums, Google reviews, etc.)
 
