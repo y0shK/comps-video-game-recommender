@@ -18,6 +18,9 @@ from sklearn.svm import SVC
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import f1_score, precision_score, recall_score
+
+import pandas as pd
+from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 from sklearn.decomposition import PCA
@@ -363,6 +366,56 @@ disp = ConfusionMatrixDisplay(confusion_matrix=cm)
 disp.plot()
 plt.show()
 
+print("completed evaluation of SVM")
+
+"""
+3c. Perform hyperparameter tuning to compare performance across a range of C-values for the SVM.
+C-value is inversely proportional to tightness of fit; how close should points be wrapped around the margin?
+    As C decreases, the model has a better fit, but it also becomes more likely to overfit to test data
+    As C increases, the model has a worse fit, but it also becomes less likely to overfit to test data
+    So, find the optimal point to trade off between fit and generality
+Goals: 
+    1. compare performance (F-1 score) across N many C-values, do so k many times (for k-fold). 
+    (We'll see N*k F-1 scores)
+    2. isolate the specific C-value that leads to best performance
+"""
+
+# perform hyperparameter tuning
+svc = SVC(gamma='auto', kernel='rbf')
+svm_hyperparams = {'svc__C':[1, 10, 100, 1000]} # for each k in k-fold validation, these hyperparams are compared
+pipeline = make_pipeline(StandardScaler(), svc)
+print("SVM for hyperparameter tuning created")
+
+# create SVM with different C hyperparameter values to find best value of C
+grid = GridSearchCV(pipeline, svm_hyperparams, scoring=['f1'], refit='f1', cv=5) # 5-fold validation
+X_lowdim = np.concatenate((X_train_lowdim, X_test_lowdim), axis=0)
+y_grid = np.concatenate((y_train, y_test), axis=0)
+
+print("grid search model created - preparing to fit")
+grid.fit(X_lowdim, y_grid)
+
+print("data passed into GridSearchCV")
+# examine results of hyperparameter tuning
+grid_results = pd.DataFrame(grid.cv_results_)
+
+# 1. compare the 4 C-values (k many times)
+print("compare f1 scores for different models w/ different C-values, using 5-fold cross-validation:")
+for i in range(0, 5):
+    current_res = 'split' + str(i) + '_test_f1'
+    print(grid_results[current_res])
+    print("\n")
+
+# 2. isolate best set of hyperparameters
+# https://stackoverflow.com/questions/30102973/how-to-get-best-estimator-on-gridsearchcv-random-forest-classifier-scikit
+print("best params: ")
+print(grid.best_params_)
+
+print("best score with those params: ")
+print(grid.best_score_)
+
+print("best index for those params: ")
+print(grid.best_index_)
+
 """
 4. Add some test cases for evaluation
 Fit PCA on a query and a similar game to the query.
@@ -395,7 +448,7 @@ run_testcase(query="The Legend of Zelda: Breath of the Wild", rec="Sid Meier's C
 # expected 1 - received 0
 run_testcase(query="Super Mario Galaxy 2", rec="Banjo-Tooie", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 0 - received 1
+# expected 0 - received 0
 run_testcase(query="Super Mario Galaxy 2", rec="Sid Meier's Civilization V", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
 # expected 0 - received 1
