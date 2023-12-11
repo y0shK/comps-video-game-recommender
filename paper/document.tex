@@ -66,35 +66,6 @@ On the societal level, recommender systems are critical to today's highly techno
 The difficulty of the project stems from the machine learning side of the problem. Because common approaches for recommendation systems require immense amounts of user data and interconnected user profiles, they are not practical for the scope of this project. Instead, transforming the recommendation problem into a supervised learning problem allows me the opportunity to practice real-world machine learning. Deciding which dataset I can use to provide ground-truth labels for recommendation is good practice, because real-world applications of ML often require extracting and preprocessing data from different sources. After obtaining the data, practicing iterative ML algorithm improvement - specifically identifying breakpoints and making changes to the algorithm to test out new hypotheses - has helped me gain a better perspective of how ML works.
 
 \section{Technical Background}
-Current approaches to recommendation use two main strategies, collaborative filtering and content-based recommendations.
-Collaborative filtering takes the similarity of other users
-into account when linking together products and making
-recommendations. For example, consider a user who enjoys playing Super Mario Bros. Collaborative filtering examines other users who also enjoy Super Mario Bros and
-recommends their enjoyed entries back to the initial user.
-This approach is frequently used in larger databases with
-data-dense entries. Even though collaborative
-filtering can provide another dimension to recommendation
-than just looking at product similarity, it fundamentally requires a sense of trust that other users can and will provide
-effective suggestions. This limitation is addressed in models that improve on benchmark collaborative filtering.
-
-% for collaborative filtering, cite:
-% cite Anthony Chow
-        %Hdioud Ferdaous
-        %Javier Perez-Marcos
-        % Gohari for trust
-
-By contrast, content-based recommendations examine
-how different entities which are recommended can connect
-together. These recommendations put products together in
-semantic ways to test for similarity. One approach
-involves converting string queries (e.g., game titles like "Breakout" or "Tetris") or string content (game descriptions, reviews, and other corpora) into numerical vectors and comparing their contents to vectors of related games. The TF-IDF algorithm uses sparse numerical vectors (meaning that most vector elements are 0) to identify common keywords and penalize non-informatic keywords, and approaches that use it aim to find patterns of highly informatic, low-density word usage. \cite{Meidl, Zhang, DWang} Similarly, word embedding approaches such as Word2Vec \cite{Word2Vec} or the Google Universal Sentence Encoder \cite{SentenceEncoder} use dense vectors (with mostly non-zero vector elements) to compare similarity.
-
-FIXME Supervised learning and ML paragraph
-
-% for ML
-% cite SMOTE - cited
-% cite SVM https://link.springer.com/content/pdf/10.1007/bf00994018.pdf - cited
-
 
 %This section introduces the technical knowledge necessary to understand your project, including any terminology and algorithms.
 %You should assume that the reader is a CS undergraduate like yourself, but not necessarily familiar with AI/ML/HCI/apps/video games/etc.
@@ -120,6 +91,9 @@ FIXME Supervised learning and ML paragraph
     Supervised ML.
         Machine learning
         Supervised learning
+
+        DEFINE supervised learning
+        
             synthetic minority oversampling
 
             SMOTE - cited
@@ -139,7 +113,8 @@ FIXME Supervised learning and ML paragraph
         Ryan: - cited
         Using NLP (specifically latent semantic analysis). Find most informatic words and conduct LSA on high-dimensional data on Wikipedia articles of digital games. Also use to make a tool for future game researchers
         https://users.soe.ucsc.edu/~jor/publications/ryanGamesStudiesUsingNLP.pdf
-        
+
+        DEFINE word embeddings
 
         Sundermann: - cited
 
@@ -153,6 +128,18 @@ FIXME Supervised learning and ML paragraph
     
         Word embeddings - Sundermann et al. and Nguyen et al.
 \end{comment}
+
+Current approaches to recommendation systems use two main strategies, collaborative filtering and content-based recommendations. Content-based approaches examine how different entities connect together in qualitative ways. These recommendations typically cluster semantically similar products (especially when text-based descriptions are reasonable indicators of product appeal). One approach involves converting string queries (e.g., game titles like "Breakout" or "Tetris") or string content (game descriptions, reviews, and other corpora) into numerical vectors and comparing their contents to vectors of related games. The TF-IDF algorithm uses sparse numerical vectors (meaning that most vector elements are 0) to identify common keywords and penalize non-informatic keywords, and approaches that use it aim to find patterns of highly informatic, low-density word usage. \cite{Meidl, Zhang, DWang} Similarly, word embedding approaches such as Word2Vec \cite{Word2Vec} or the Google Universal Sentence Encoder \cite{SentenceEncoder} use dense vectors (with mostly non-zero vector elements) to compare similarity.
+
+On the other hand, approaches that use collaborative filtering consider user similarity when linking together products. The key idea of collaborative filtering is to find a product that a customer likes, find related users in the database who like the same product, and use the related users' profiles to generate suggestions for the customer. As an example, consider a user who shares that they enjoy playing Super Mario Bros. Collaborative filtering examines other users in the database who also enjoy Super Mario Bros and recommends their enjoyed entries back to the initial user. The database thus needs to be data-dense enough to connect related users to the input provided by the initial user. Within industry, this data density requirement means that collaborative filtering is especially powerful in recommendation systems like Spotify \cite{JacobsonSpotify} which have a large, communicative user base. In the research world, collaborative filtering-based approaches are standard in the literature. \cite{Chow, Ferdaous, PerezMarcos} Collaborative filtering is a technique influential enough it can form a benchmark model for future improvements. \cite{Gohari, Ramzan} 
+
+In both content-based approaches and collaborative filtering applications, recommender systems require large datasets of products and users to effectively find connections between entities. Machine learning poses a way to process this immense data and identify patterns to form clusters, similarities, and eventually recommendations. Many types of machine learning techniques are applied to the recommendation problem - supervised learning (where labels are known ahead of time), unsupervised learning (where the algorithm learns to cluster features by itself), and other approaches are also used. \cite{Nawrocka, XuAraki} Supervised learning algorithms are especially helpful in recommendation for a project of this scope, because answers are known ahead of time, so the focus can be improving the recommendation algorithm with respect to standard evaluation metrics rather than considering recommendation-specific evaluation metrics. Depending on the recommendation problem, different types of algorithms can be used.
+
+In my comps project, the problem of recommendation is transformed from a collaborative filtering problem into a supervised learning problem. Because collaborative filtering requires millions of user profiles, any algorithm that uses collaborative filtering needs access to a robust user dataset. Instead, this project finds ground truth labels for recommendation from an online application programming interface (API) and builds a machine learning algorithm to perform well on the dataset. Thus, the problem turns from recommendation to \textit{reconstruction} of a recommendation algorithm via machine learning. The supervised learning problem is formulated as follows: Given an input game $g$, decide whether a potential recommendation game $r$ should be recommended.
+
+To solve this supervised learning problem, the support vector machine (SVM) algorithm is used. SVM is a binary classifier, so it discriminates between two classes. SVM creates a nonlinear decision boundary between points of these two classes (1s and 0s) such that distances from the margin are reduced as much as possible. \cite{CortesVapnikSVM} Cases with high class imbalances (where there are far more 0s than 1s, or vice versa) can be addressed by artificially creating similar points and adding those to the lesser class. \cite{NVChawla} The way that SVM is constructed combines optimal margin classification (reducing margin distances) and an efficient "kernel trick" which teaches the classifer how to map to nonlinear decision boundaries. By definition, the kernel trick helps SVM to work with high-dimensional data, which makes SVM particularly effective for problems that require high-dimensional inputs. \cite{Joachims, Berbatova} 
+
+The input to the SVM uses techniques from natural language processing (NLP) to transform textual data into numerical data that the machine learning model can use for training and testing. One possible NLP approach is to identify informatic words by topic modeling, where key ideas are extracted from a series of documents and used as ML features. \cite{Ryan_51, Reuver} A related, but distinct, approach is to identify informatic words by context/through their syntactic structure \cite{Meidl, LDiCaro}. Another technique is to use word embedding vectors or matrix/tensor representations of word embeddings, where words are mathematically transformed from strings to floats and represented in N-dimensional space. \cite{Sifa_tensor} These approaches rely on powerful ideas from linear algebra to turn informatic text content into numerical machine learning features.
 
 \section{Prior Work}
 
@@ -249,6 +236,14 @@ FIXME Supervised learning and ML paragraph
     
 \end{comment}
 
+Prior work uses key ideas outlined in the technical background section as a foundation and strives to pivot and iterate upon them. For instance, some approaches take collaborative filtering as a baseline and provide a more efficient, performant model. Others address limitations of collaborative filtering (the issue of \textit{only} considering user profiles) and content-based recommendation (the difficulty of gathering enough data to start the recommendation process) by combining them with other techniques. Many approaches display an interdisciplinary perspective by combining collaborative filtering with ideas from related fields (computational linguistics/NLP, ML, and so on).
+
+Because of collaborative filtering's efficacy in the recommendation space, many approaches combine content-based methodology and non-social numerical metrics with collaborative filtering models. Within industry, the Steam Interactive Recommender \cite{SteamInteractiveRecommender} looks at users who own similar games in their library and who thumbed up similar games in their review catalog to recommend games, but it also uses quantitative metrics like user play time. Play time is an objective, non-user profile metric that nonetheless is an informatic factor that can further support a glowing recommendation or similarity across game ownership. Quantic Foundry \cite{QuanticFoundryRecommender} has an online recommender that solicits three games that the user enjoys in order to generate recommendations. Quantic Foundry's process combines collaborative filtering with profiles of gamer psychology - what motivates and interests players is a qualitative metric that further informs their collaborative filtering approach. Within the research world, collaborative filtering is often a benchmark model or baseline approach. Many approaches combine collaborative filtering with other analyses and hybrid methodologies. \cite{Choi, Gohari, PerezMarcos}
+
+Interdisciplinary approaches using ML and NLP are also common because of their ability to apply various performant algorithms to the recommendation space. Machine learning algorithms like SVM can be tuned to delineate and output recommendation, which inspired part of the methodology in my project. \cite{XuAraki} Because these ML algorithms are used to simulate recommendation, conventional ML metrics are used to evaluate the approaches as well \cite{Nawrocka, Chowdhury, Sujatha}. Similarly, NLP approaches appear in recommender systems as a means to categorize, extract, and recommend different entities. Content-based approaches that focus on categories like genre, theme, or sentiment as features help to classify the propriety of a potential recommendation. \cite{Berbatova, Asani}
+
+A specific subset of ML and NLP approaches can help address the limitations of typical recommendation approaches. These limitations are primarily the difficulty of gathering enough information to start finding related items (the "cold start" problem). Any representation or data structure that can provide a qualitative feature (removed from quantitative metrics like similarity score, number of connections, etc.) is a potential improvement in performance. Some researchers turn to word embeddings as an answer. Combining word embedding content analysis with benchmark collaborative filtering obtains the best of both worlds from related users and products. \cite{LNguyen} Similarly, context-aware methods of word embeddings (context sensitivity, syntactic structure/relationships, etc.) provide relationships between key words in recommendation corpora that can be informatic features in their own right, independent of data-dense game relatedness. \cite{CSundermann, Ramzan}.
+
 \section{Methods}
 
 %This section describes what exactly you will be working on.
@@ -317,6 +312,8 @@ FIXME Supervised learning and ML paragraph
 
     Why is word embedding used instead of TF-IDF? TF-IDF uses sparse word vectors, so the majority of the elements coming from the vectors are zero elements. (There are artificial positive matches between queries and potential recommendations because all vectors contain mostly 0s, so the overlap is the same even if the nonzero content is not.) By contrast, word embeddings use dense word vectors, so the majority of the elements are NOT zero elements.
 
+    - Hyperparameter tuning
+
     - Outcome.
 
     Feed query game and potential recommendation into SVM. Then the output is whether or not the game should be recommended.
@@ -331,6 +328,72 @@ FIXME Supervised learning and ML paragraph
     
 \end{comment}
 
+\subsection{Problem Formulation}
+
+I am reconstructing the GiantBomb API (specifically the GiantBomb similarity algorithm) by using a support vector machine algorithm trained on word embeddings of game descriptions. The GiantBomb API acts as follows: given a query game $g$, it gives a set of similar games $S$. For this project, for every $s \in S$, $s$ is considered a valid recommendation for $g$, and for every $n \not\in S$, $n$ is not a valid recommendation for $g$. So, $GB(g, s) = 1$, and $GB(g, n) = 0$. By using the GiantBomb similarity scheme as the ground truth data, the supervised learning algorithm reconstructs the GiantBomb similarity algorithm.
+
+Thus, the problem statement is as follows. Given a query game $g$ and a potential recommendation $r$ as input, give output of whether the recommendation makes sense with respect to the query. 
+
+\begin{equation}
+    recommender(g, r) = 1
+\end{equation}
+
+Eq. 1: r makes sense as a recommendation with respect to g.
+
+\begin{equation}
+    recommender("Tetris", "Breakout") = 1
+\end{equation}
+
+Eq. 2: Breakout makes sense to recommend if Tetris is the query game.
+
+Ideas from prior work suggest that collaborative filtering is best used when millions of user profiles are available to extract data-dense connections between items and users. Collaborative filtering works well when millions of users are keen to provide feedback on their preferences and profiles, which is why influential platforms like Spotify \cite{JacobsonSpotify}
+and Netflix \cite{NetflixRS} find success with user profile-based suggestions. For a project of this scope, transform the collaborative filtering problem into a supervised learning problem by using API recommendations as a ground truth dataset. When a query game $g$ is provided to the GiantBomb API, the API provides a set $S$ of similar games to $g$. For every $s \in S$, 
+
+\begin{equation}
+    recommender(g, s) = 1
+\end{equation}
+
+Similarly, for every $n \not\in S$, where $n$ is in the dataset,
+
+\begin{equation}
+    recommender(g, n) = 0
+\end{equation}
+
+Then the problem of recommendation has transformed into a problem of identifying the correct label (0 or 1) given the inputs.
+
+\subsection{Dataset}
+
+Game titles were obtained from a combination of GameSpot API call and Metacritic CSV. These titles were fed into the GiantBomb API, and the response was a collection of demographics (genres, themes, franchises) and text (sentence-long taglines called "deck" and longer-form paragraph called "description"). The initial query set $Q$ links game titles to their demographics and deck/description. Reviews were also extracted from the Metacritic CSV and GameSpot API where they were available.
+
+After forming the initial query set $Q$, the dataset for machine learning was built. For $g \in Q$, a set of similar games $S$ for $g$ were obtained from the GiantBomb API. Every similar game $s \in S$ to $g$ should be recommended (1). Similarly, every non-similar game $n \not\in S$ such that $n \in Q$ should not recommended (0). When reviews were available, adjective-context pairs were identified in the review text and included as a feature. \cite{Meidl} So, the word embedding vectors of deck and description (and adjective-context pairs, when available) formed the features of the dataset, and the label was either 0 or 1 depending on the game similarity.
+
+\subsection{Data processing}
+Data processing was conducted to smooth out the results. To address class imbalances (far more non-similar games than similar games), synthetic minority oversampling was used. \cite{NVChawla} This technique generates points in N-dimensional space which are similar to the points already existing in the dataset so that the labels 0 and 1 are more balanced. For the SVM algorithm, dimensionality reduction was applied by principal component analysis. \cite{Joachims} Before fitting the SVM to the data, the dataset needed to be projected from an N-dimensional space to a 2-dimensional space using linear algebra. This technique ensured that the decision boundary formed between the two classes was more precise.
+
+\subsection{Algorithm}
+For this experiment, SVM was used because of its ability to create a complex, nonlinear decision boundary between the two classes. \cite{CortesVapnikSVM} It is a better choice than other supervised learning algorithms like logistic regression, K-nearest neighbors, and tree-based models like random forest. 
+
+By design, logistic regression deals with continuous data that has real-world, inherently meaningful implications. For example, logistic regression can be used to model housing prices given features of distance to the beach, highway, etc. This data is a real-world value (physical distance) and it is continuous (since it can be measured to an arbitrary level of specificity). The word embeddings used as feature vectors here are not inherently meaningful, because they are mere numerical representations of words. A value of [0.2 -0.2] may be "closer" to a value of [-0.7 0.7] than [0.3 -0.3]. 
+
+For K-nearest neighbors, the goal is to cluster together related entities by proximity. Using this model, given a game $g$, potential recommendations could be represented as points that are close to $g$ geometrically, and they could be evaluated by Euclidean distance. However, the problem at hand is not a problem of similarity as much as a \textit{reconstruction} of the GiantBomb's similarity algorithm. Because the ground truth labels come from the GiantBomb API, the labels themselves are less interesting than the process of reconstructing the algorithm that provides the labels. As a result, an algorithm that determines similarity via inter-cluster distance is less necessary.
+
+Finally, tree-based models like random forest often require enumerably many features that are determined before model training. The idea of random forest is to create partitions that isolate one part of the dataset at a time. For example, one partition in a random forest could be "distance from the beach", where a distance greater than a certain amounts leads to a 0 label ("will not buy the house"). Every single partition in such a model is isolating certain cases. However, in this project, natural language (via deck and description) is the key feature. The variability and density of natural language makes it hard to isolate numerical, meaningful features ahead of time, so random forest cannot find meaningful partitions to use.
+
+Consequently, the SVM algorithm was the best choice for this specific use case. The algorithm was trained on the dimensionality-reduced dataset of word embedding vectors of deck/description. This dataset includes embeddings from both the query game $g$ and the potential recommendation $s \in S$ or $n \not\in S$. Word embeddings were chosen instead of TF-IDF because TF-IDF uses sparse word vectors (a majority of vector elements are 0s). If sparse vectors are used, there are artificial positive matches between query game vectors and potential recommendation game vectors because all vectors contain mostly 0s - there is overlap almost by definition. This leads to a non-discriminative classifier that is prepared to recommend everything. By contrast, word embeddings use dense word vectors, so the similarity can be constructed with respect to non-zero vector elements. 
+
+\subsection{Hyperparameter tuning}
+Hyperparameters are parameters used in model training which can be adjusted to tweak performance. They are not fundamentally related to the dataset, but they do change some aspect of the model which can slightly boost performance. 
+
+The hyperparameter of interest for SVM is the C-value, which is inversely proportional to the tightness of fit of the decision boundary. How well does the model trade off between effectively fitting the training data and remaining general enough for effectively fitting the test data? A lower C-value means that the model has a better fit on the data, but it becomes more likely to overfit on test data. By contrast, a higher C-value means that the model has a worse fit on the data, but it becomes less likely to overfit on test data. The idea of tuning the C-value is to find the optimal point between a good fit and generality.
+
+Accordingly, the C-value is used as a hyperparameter of interest. 5-fold cross validation is used to split the train/test data in 5 different ways so that C-values can be compared across different sections of the dataset. C-values of 1, 10, 100, and 1000 were compared.
+
+\subsection{Outcome}
+The desired outcome is a provided label (0 or 1) when a query $g$ and a potential recommendation $r$ are fed into the algorithm. This outcome meets the goal of the project, because the idea is to use a supervised learning approach to reconstruct what the GiantBomb API would say. More specifically, the GiantBomb API takes a query $g$ and returns a set of similar games $S$ in an operation $getSimilar(g) = S$. 
+
+A valid recommendation is defined as $GB(g, s) = 1$ for some $s \in S$. So, the GiantBomb API result (0 or 1) can be determined by checking if the potential recommendation $r \in S$. 
+
+So, running $SVM(g, r)$ simulates running $getSimilar(g)$ and checking if $r$ is in the resulting set $S$. Since the SVM algorithm gives a label, that label is equivalent to running and checking whether or not $r$ should actually be recommended ($r \in S$). In this way, the SVM is able to reconstruct what the GiantBomb API thinks about game similarity.
 
 \section{Evaluation Metrics}
 
@@ -402,14 +465,6 @@ Learning Algorithms in Prediction of Heart Disease
         Confusion matrix visualization
 
 
-    - Testcase performance
-
-        How well does the recommender output conform to test case output?
-
-    - Human vs. ML output agreement?
-
-        If a reasonably knowledgeable volunteer (i.e., self reported interest and basic schema) has similar output as algorithm output 
-
     Minimum viable product - pipeline is explainable and performance outperforms random guessing. (Given a class balance, random guessing is right 50% of the time - can the model outperform this?)
 
     More time and resources - pipeline is explainable and performance outperforms random guessing w/ agreement from several testcase suites and human volunteers
@@ -417,6 +472,22 @@ Learning Algorithms in Prediction of Heart Disease
     Best case scenario: pipeline is explainable and performance outperforms random guessing w/ agreement from several testcase suites and human volunteers, and NLP approaches would be validated by human volunteers
     
 \end{comment}
+
+Since the problem of interest has been turned from a recommendation problem (considering standard approaches of collaborative filtering and content-based analysis) into a supervised learning problem, an immense amount of user data, preferences, and connections is no longer needed. To evaluate the methods, standard machine learning metrics can be used.
+
+Even though the features for the machine learning model use word vectors of deck and description, cosine similarity is not applicable as a metric for the end result. Cosine similarity is used frequently in the literature \cite{Ferdaous, Ryan_47, STata}, but it is primarily used in cases where word order and natural language context is not considered. (For instance, a database search only requires string similarity between a query and an article - it does not necessarily need \textit{semantic} similarity beween the two tokens.) In other words, raw word counts and frequencies are the features rather than the semantics of the words themselves. Since the features for the SVM are primarily natural language, context (word order, syntactic structure, and parts of speech) still matter for effectively training the classifier. 
+
+Other standard metrics of recommendation systems are inapplicable because they measure good recommendation rather than good reconstruction. Some recommender systems evaluate results with respect to the user rather than with respect to an external set of ground truth data. Novelty, serendipity (a measure of unexpectedness and relevance for the user), and other such metrics are valuable when the evaluation considers whether the user likes the product. \cite{Cremonesi} For instance, scoring well on serendipity is a good sign for a system like Amazon \cite{AmazonRS} which wants to maximize profit by presenting new yet useful products to customers. However, the project focuses on reconstruction of the GiantBomb API rather than measuring how well users would like a recommendation $r$ given that they like a query $g$. This focus makes conventional ML metrics more relevant for evaluation.
+
+Precision, recall, and F-1 score are all essential evaluation metrics for any supervised learning algorithm. \cite{NAlAzzam, Chowdhury, Sujatha} Precision calculates $\frac{TP}{TP + FP}$, which indicates how well the model accurately recommended games that are in the similar game set $S$. Recall calculates $\frac{TP}{TP + FN}$, which indicates how well the model stayed away from recommending incorrect potential recommendations. F-1 score is a metric that combines precision and recall. These metrics (which can be visualized with a confusion matrix) are valuable tools to understand how well the algorithm performs a trade-off between correctly recommending all games it should and correctly staying away from all games it should.
+
+For a model that reconstructs a similarity score to simulate a recommendation problem, it makes sense to slightly prioritize precision over recall. Precision involves the correctness of the overall recommendations - how likely was the model's recommendation to be true? Recall involves the correctness of the model staying away from recommendations - how many true recommendations did it miss? People have a finite amount of time for entertainment. This means that a) they cannot possibly consume everything, so missing out on a theoretically good recommendation is less important and b) their time means more in general, so the displeasure of a bad recommendation is higher. 
+
+In addition to standard metrics of precision and recall, manual test cases are constructed and applied. These are not fundamental indicators of performance like precision, recall, and F-1 score, but they are informal, intuition-based metrics which can indicate whether the model is leaning more towards precision or recall. Given an expectation of $SVM(g, r)$, does the test case conform to the expectation? Running these experiments allows for an informal assessment of whether the model errs on the side of high false positives (over-eager to recommend) or high false negatives (missing opportunities to recommend).
+
+The minimum viable product for this project is a machine learning algorithm that outperforms random guessing. Assuming that the classes are balanced, an algorithm that always returns 1 will be correct 50\% of the time. Outperforming random guessing with an F-1 score greater than 0.5 is a benchmark that indicates basic satisfiability for the model.
+
+With more time and resources, the goal for the project would be a machine learning algorithm that is more performant (around 0.8 F-1 score). The best case scenario would be an algorithm that is highly perfomant (around 0.9 F-1 score, which is typically seen in the literature) and explainable (where test cases conform to intuition from several human volunteers interested in video game recommendation).
 
 \section{Results and Discussion}
 
@@ -493,6 +564,12 @@ is forwarded to the algorithm.
 \section{Future Work, and Conclusion}
 
 \begin{comment}
+
+     FIXME
+     moderate or standardize the descriptions used as input to the SVM. 
+     
+     Consider this:
+     Descriptions may be written by different authors even if they come from the same API, and this potentially introduces variability. I plan to address this in my paper as an extension for future work and consider some potential ways to handle it (perhaps collecting descriptions for one game from various APIs as an improvement). 
 
     Future work can involve training the model beyond word embeddings so that it can capture similar qualitative aspects of the game. (this improves recall)
     
