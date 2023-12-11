@@ -186,6 +186,9 @@ def get_adjective_context_pairs(en_nlp, pr, upper_limit=1000000): # can extend e
                 out_dict[pos_str] = tok
         chunk_contexts.append(out_dict)
 
+    # structure of chunk_contexts:
+    # {'noun': 'atmosphere', 'adj': amazing, 'adv': maybe, ...}
+
     # now tie together words
     for context in chunk_contexts:
         if 'noun' in context.keys() and 'adj' in context.keys():

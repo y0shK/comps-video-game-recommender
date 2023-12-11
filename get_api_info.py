@@ -59,7 +59,9 @@ def get_gamespot_game_info(api_key, headers, offset, session=my_session):
                             'genres': genre_list, 
                             'themes': theme_list, 
                             'franchises': franchise_list,
-                            'review': ''}
+                            'review': '',
+                            'body': '',
+                            'lede': ''}
     return game_data
 
 """
@@ -176,7 +178,9 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         'genres': '', 
         'themes': '', 
         'franchises': '',
-        'review': ''
+        'review': '',
+        'body': '',
+        'lede': ''
     }}
 
     for i in range(min(num_results, 5)):
@@ -246,24 +250,70 @@ def get_giantbomb_game_info(api_key, query, headers, session=my_session):
         'themes': query_theme, 
         'franchises': query_franchise, 
         'review': '',
+        'body': '',
+        'lede': '',
         'guid': GUID # provide in returned dict for external use via future API calls
     }
 
     return query_game_dict
 
 """
-get_gamespot_reviews
-Get reviews from GameSpot games
+get_gamespot_associated_review_games
+Add reviews from GameSpot to the dataset
+Get reviews from GameSpot games, then find those games on GiantBomb to add demographic information
 Arguments: 
-    api_key (string): API key for GameSpot
+    gamespot_key (string): API key for GameSpot
+    giantbomb_key (string): API key for GiantBomb
     headers (string): specify User-Agent field
     session (CachedSession): optional session to store results in local cache
 Returns:
     review_data (dict): key=name and value=
     id, name, deck, description, genres, themes, franchises
 """
-def get_associated_review(api_key, headers, session, query_dict):
-    pass # FIXME grab reviews from GameSpot - implement or delete later as needed
+def get_gamespot_associated_review_games(gamespot_key, giantbomb_key, headers, session):
+    review_url = "http://www.gamespot.com/api/reviews/" + "?api_key=" + gamespot_key + "&format=json"
+    review_resp = session.get(review_url, headers=headers)
+
+    try:
+        review_json = json.loads(review_resp.text)
+    except ValueError:
+        return {}
+    
+    results = review_json['results']
+
+    games = {}
+    for rev in results:
+        if rev['game']['name'] != "" and rev['body'] != "" and rev['lede'] != "":
+            name = rev['game']['name']
+            body = rev['body']
+            lede = rev['lede']
+            games[name] = {'body': body, 'lede': lede}
+
+    associated_review_dict = {}
+    for k, v in games.items():
+        demographic = get_giantbomb_game_info(api_key=giantbomb_key, query=k, headers=headers, session=session)
+
+        add_to_dict = True
+
+        if demographic:
+            if k in demographic:
+                for kd, vd in demographic[k].items():
+                    if vd == '':
+                        add_to_dict = False
+                    
+                if add_to_dict:
+                    demographic[k]['body'] = v['body']
+                    demographic[k]['lede'] = v['lede']
+                    #print("demographic")
+                    #pdb.set_trace()
+                    associated_review_dict[k] = demographic
+    
+    #print("check associated review dict")
+    #pdb.set_trace()
+
+    return associated_review_dict
+
+
     
 
 
@@ -318,7 +368,9 @@ def get_similar_games(api_key, query, headers, max_similar=-1, session=my_sessio
         'genres': '', 
         'themes': '', 
         'franchises': '',
-        'review': ''
+        'review': '',
+        'body': '',
+        'lede': ''
     }}
 
     # return dummy game if no such query is found
@@ -414,5 +466,7 @@ def get_similar_games(api_key, query, headers, max_similar=-1, session=my_sessio
                             'genres': genre_list,
                             'franchises': franchise_list,
                             'themes': theme_list,
-                            'review': ''}
+                            'review': '',
+                            'body': '',
+                            'lede': ''}
     return similar_games_output

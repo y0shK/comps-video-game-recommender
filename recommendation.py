@@ -27,7 +27,7 @@ from sklearn.decomposition import PCA
 from imblearn.over_sampling import SMOTE
 from collections import Counter
 
-from get_api_info import get_giantbomb_game_info, get_associated_review, get_gamespot_games, get_similar_games
+from get_api_info import get_giantbomb_game_info, get_gamespot_associated_review_games, get_gamespot_games, get_similar_games
 from process_recs import process_text, check_valid_deck_and_desc, return_valid_review, get_embedding, check_valid_demographics, preprocess_review, get_adjective_context_pairs
 from testcases import run_testcase
 from visuals import update_demographic_dict, create_histogram
@@ -47,22 +47,16 @@ GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 csv_titles_df = pd.read_csv("metacritic_game_info.csv")
 csv_reviews_df = pd.read_csv("metacritic_game_user_comments.csv")
 
-
-# test spacy
-print("Loading in spacy web model")
-#en_nlp = en_core_web_sm.load()
-
+"""
+Test get associated review games
+"""
+#review_d = get_associated_review_games(gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
+#print("check review_d")
 #pdb.set_trace()
+
+print("Loading in spacy web model")
 download("en_core_web_sm")
 en_nlp = spacy.load("en_core_web_sm")
-#en_nlp = spacy.load('en_core_web_lg')
-
-
-pdb.set_trace()
-testrev = "dazzling locations bright visuals generally flexible forgiving gameplay"
-print(get_adjective_context_pairs(en_nlp, testrev))
-
-pdb.set_trace()
 
 """
 1. Form a query set by combining games from metacritic csv and GameSpot API
@@ -103,9 +97,17 @@ print("check reviews")
 pdb.set_trace()
 
 # get gamespot games - (game_count * 99) games before filtering
-gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, session=session)
+# get more games (depending on how many games in dataset also have gamespot reviews; 
+# 0 <= N <= 99) from gamespot review api
+gamespot_games = get_gamespot_games(api_key=GAMESPOT_API_KEY, headers=HEADERS, game_count=2, session=session) # no review
+gs_review_games = get_gamespot_associated_review_games(gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session) # have review body/lede
 
 query_set = {**query_set, **gamespot_games}
+query_set = {**query_set, **gs_review_games}
+
+print("check query set")
+pdb.set_trace()
+
 print("dataset size: ", len(query_set))
 
 """
@@ -178,7 +180,11 @@ for k, v in query_set.items():
             adj_noun_pairs = []
 
         tokenized_review = return_valid_review(sv['review'])
-        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review + adj_noun_pairs
+
+        # get gamespot review sentence/paragraph if it exists
+        body_lede = sv['body'] + sv['lede']
+        tokenized_body_lede = return_valid_review(body_lede)
+        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review + tokenized_body_lede + adj_noun_pairs
         word_embedding = get_embedding(model, tokenized_list)
 
         X.append(word_embedding)
@@ -209,6 +215,9 @@ for k, v in query_set.items():
         franchises_dict_1 = update_demographic_dict(current_franchise, franchises_dict_1)
 
     for nk, nv in query_set.items():
+
+        #print(nv)
+
         if nk in similar_games_instance:
             continue
 
@@ -234,7 +243,11 @@ for k, v in query_set.items():
         tokenized_deck = process_text(deck)
         tokenized_desc = process_text(desc)
         tokenized_review = return_valid_review(sv['review'])
-        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review + adj_noun_pairs
+
+        # get gamespot review sentence/paragraph if it exists
+        body_lede = nv['body'] + nv['lede']
+        tokenized_body_lede = return_valid_review(body_lede)
+        tokenized_list = init_tokenized_list + tokenized_deck + tokenized_desc + tokenized_review + tokenized_body_lede + adj_noun_pairs
         word_embedding = get_embedding(model, tokenized_list)
 
         X.append(word_embedding)
@@ -331,7 +344,7 @@ This will make the vectors easier to visualize to assess SVM performance
 
 3b. Feed 2-D train and test set into SVM and evaluate the model.
 """
-clf = make_pipeline(StandardScaler(), SVC(gamma='auto', kernel='rbf'))
+clf = make_pipeline(StandardScaler(), SVC(C=1000, gamma='auto', kernel='rbf')) # based on hyperparameter search
 # https://stackoverflow.com/questions/71386142/valueerror-x-has-2-features-but-minmaxscaler-is-expecting-1-features-as-input
 pca = PCA(n_components = 2) # we want 2 dimensions to visualize
 
@@ -439,16 +452,16 @@ run_testcase(query='Breakout', rec="Baldur's Gate", model=model, clf=clf, gamesp
 run_testcase(query='Super Mario Bros', rec="The Great Giana Sisters", model=model, clf=clf, \
              gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 1 - received 1
+# expected 1 - received 0
 run_testcase(query="The Legend of Zelda: Breath of the Wild", rec="Horizon Zero Dawn", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
 # expected 0 - received 1
 run_testcase(query="The Legend of Zelda: Breath of the Wild", rec="Sid Meier's Civilization V", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 1 - received 0
+# expected 1 - received 1
 run_testcase(query="Super Mario Galaxy 2", rec="Banjo-Tooie", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 0 - received 0
+# expected 0 - received 1
 run_testcase(query="Super Mario Galaxy 2", rec="Sid Meier's Civilization V", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
 # expected 0 - received 1
