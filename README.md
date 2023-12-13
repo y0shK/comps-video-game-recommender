@@ -7,7 +7,7 @@ This project is a supervised learning model that uses word embeddings of short-f
 * obtain API keys from GiantBomb and GameSpot
 * create .env in the same directory as recommendation.py by using the following command: touch .env
 * put API keys into .env
-* download metacritic\_game\_info.csv from Kaggle link, and put in same directory as recommendation.py
+* download metacritic\_game\_info.csv and metacritic\_game\_user\_comments.csv from Kaggle link, and put both files in same directory as recommendation.py
 * create conda environment and use the following command: conda create --name YOUR_ENV --file requirements.txt
 * python recommendation.py
 

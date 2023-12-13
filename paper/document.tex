@@ -29,8 +29,6 @@
 \begin{document}
 
 \maketitle
-
-% FIXME put references in each section
  
 \section{Introduction and Problem Context}
 
@@ -365,7 +363,7 @@ Then the problem of recommendation has transformed into a problem of identifying
 
 Game titles were obtained from a combination of GameSpot API call and Metacritic CSV. These titles were fed into the GiantBomb API, and the response was a collection of demographics (genres, themes, franchises) and text (sentence-long taglines called "deck" and longer-form paragraph called "description"). The initial query set $Q$ links game titles to their demographics and deck/description. Reviews were also extracted from the Metacritic CSV and GameSpot API where they were available.
 
-After forming the initial query set $Q$, the dataset for machine learning was built. For $g \in Q$, a set of similar games $S$ for $g$ were obtained from the GiantBomb API. Every similar game $s \in S$ to $g$ should be recommended (1). Similarly, every non-similar game $n \not\in S$ such that $n \in Q$ should not recommended (0). When reviews were available, adjective-context pairs were identified in the review text and included as a feature. \cite{Meidl} So, the word embedding vectors of deck and description (and adjective-context pairs, when available) formed the features of the dataset, and the label was either 0 or 1 depending on the game similarity.
+After forming the initial query set $Q$, the dataset for machine learning was built. For $g \in Q$, a set of similar games $S$ for $g$ were obtained from the GiantBomb API. Every similar game $s \in S$ to $g$ should be recommended (1). Similarly, every non-similar game $n \not\in S$ such that $n \in Q$ should not recommended (0). When reviews were available, adjective-context pairs were identified in the review text using dependency parsing and included as a feature. \cite{Meidl, LDiCaro} So, the word embedding vectors of deck and description (and adjective-context pairs, when available) formed the features of the dataset, and the label was either 0 or 1 depending on the game similarity.
 
 \subsection{Data processing}
 Data processing was conducted to smooth out the results. To address class imbalances (far more non-similar games than similar games), synthetic minority oversampling was used. \cite{NVChawla} This technique generates points in N-dimensional space which are similar to the points already existing in the dataset so that the labels 0 and 1 are more balanced. For the SVM algorithm, dimensionality reduction was applied by principal component analysis. \cite{Joachims} Before fitting the SVM to the data, the dataset needed to be projected from an N-dimensional space to a 2-dimensional space using linear algebra. This technique ensured that the decision boundary formed between the two classes was more precise.
@@ -418,11 +416,11 @@ So, running $SVM(g, r)$ simulates running $getSimilar(g)$ and checking if $r$ is
 
     Novelty, serendipity, etc. These are valuable when the evaluation concerns value of product (e.g., would user like the recommended game/movie/app etc.) Instead, my project is focused on maximizing TP and TN, which is a purely numerical metric independent of user input
     
-    https://dl.acm.org/doi/10.1145/1864708.1864721 - cited
+    Cremonesi - https://dl.acm.org/doi/10.1145/1864708.1864721 - cited
 
     See this literature:
 
-    https://dl.acm.org/doi/abs/10.1145/1328854.1328855 - "cosine similarity has proven to be a robust metric for scoring the similarity between two strings, and it is increasingly being used in complex queries" - database management but NOT natural language processing - cited
+    Tata - https://dl.acm.org/doi/abs/10.1145/1328854.1328855 - "cosine similarity has proven to be a robust metric for scoring the similarity between two strings, and it is increasingly being used in complex queries" - database management but NOT natural language processing - cited
 
     precision, recall, F-1 score
 
@@ -479,15 +477,15 @@ Even though the features for the machine learning model use word vectors of deck
 
 Other standard metrics of recommendation systems are inapplicable because they measure good recommendation rather than good reconstruction. Some recommender systems evaluate results with respect to the user rather than with respect to an external set of ground truth data. Novelty, serendipity (a measure of unexpectedness and relevance for the user), and other such metrics are valuable when the evaluation considers whether the user likes the product. \cite{Cremonesi} For instance, scoring well on serendipity is a good sign for a system like Amazon \cite{AmazonRS} which wants to maximize profit by presenting new yet useful products to customers. However, the project focuses on reconstruction of the GiantBomb API rather than measuring how well users would like a recommendation $r$ given that they like a query $g$. This focus makes conventional ML metrics more relevant for evaluation.
 
-Precision, recall, and F-1 score are all essential evaluation metrics for any supervised learning algorithm. \cite{NAlAzzam, Chowdhury, Sujatha} Precision calculates $\frac{TP}{TP + FP}$, which indicates how well the model accurately recommended games that are in the similar game set $S$. Recall calculates $\frac{TP}{TP + FN}$, which indicates how well the model stayed away from recommending incorrect potential recommendations. F-1 score is a metric that combines precision and recall. These metrics (which can be visualized with a confusion matrix) are valuable tools to understand how well the algorithm performs a trade-off between correctly recommending all games it should and correctly staying away from all games it should.
+Precision, recall, and F-1 score are all essential evaluation metrics for any supervised learning algorithm. \cite{NAlAzzam, Chowdhury, Sujatha} Precision calculates $\frac{TP}{TP + FP}$. Given that the model labels the instance as 1, how often is the model correct - how often is the recommendation $r \in S$? Recall calculates $\frac{TP}{TP + FN}$. Given that the label is 1 in actuality, how many 1s did the model accurately capture - how many items $r_1, r_2, \dots, r_n$ were recommended by the model, given that $\{r_1, r_2, \dots, r_n\} \in S$? Finally, F-1 score is a metric that combines precision and recall. These metrics (which can be visualized with a confusion matrix) are valuable tools to understand how well the algorithm performs a trade-off between correctly recommending all games it should and correctly staying away from all games it should.
 
-For a model that reconstructs a similarity score to simulate a recommendation problem, it makes sense to slightly prioritize precision over recall. Precision involves the correctness of the overall recommendations - how likely was the model's recommendation to be true? Recall involves the correctness of the model staying away from recommendations - how many true recommendations did it miss? People have a finite amount of time for entertainment. This means that a) they cannot possibly consume everything, so missing out on a theoretically good recommendation is less important and b) their time means more in general, so the displeasure of a bad recommendation is higher. 
+For a model that reconstructs a similarity score to simulate a recommendation problem, it makes sense to prioritize precision over recall. Precision involves the correctness of the overall recommendations. Given that the model labeled an instance as "recommend," how likely was that label to be true? Recall involves the correctness of the model in getting all instances that \textbf{should} have been recommended - how many true recommendations did it miss? People have a finite amount of time for entertainment. This means that a) they cannot possibly consume everything, so missing out on a theoretically good recommendation is less important and b) their time means more in general, so the displeasure of a bad recommendation is higher. 
 
 In addition to standard metrics of precision and recall, manual test cases are constructed and applied. These are not fundamental indicators of performance like precision, recall, and F-1 score, but they are informal, intuition-based metrics which can indicate whether the model is leaning more towards precision or recall. Given an expectation of $SVM(g, r)$, does the test case conform to the expectation? Running these experiments allows for an informal assessment of whether the model errs on the side of high false positives (over-eager to recommend) or high false negatives (missing opportunities to recommend).
 
 The minimum viable product for this project is a machine learning algorithm that outperforms random guessing. Assuming that the classes are balanced, an algorithm that always returns 1 will be correct 50\% of the time. Outperforming random guessing with an F-1 score greater than 0.5 is a benchmark that indicates basic satisfiability for the model.
 
-With more time and resources, the goal for the project would be a machine learning algorithm that is more performant (around 0.8 F-1 score). The best case scenario would be an algorithm that is highly perfomant (around 0.9 F-1 score, which is typically seen in the literature) and explainable (where test cases conform to intuition from several human volunteers interested in video game recommendation).
+With more time and resources, the goal for the project would be a machine learning algorithm that is more performant (around 0.8 F-1 score). The best case scenario would be an algorithm that is highly performant (around 0.9 F-1 score, which is typically seen in the literature) and explainable (where test cases conform to intuition from several human volunteers interested in video game recommendation).
 
 \section{Results and Discussion}
 
@@ -526,7 +524,36 @@ With more time and resources, the goal for the project would be a machine learni
     
 \end{comment}
 
-%limitations
+Table 1 displays the standard ML metrics for this project.
+
+\begin{center}
+\begin{tabular}{ | m{5em} | m{1cm}| m{1cm} | } 
+  \hline
+  Precision & 0.825 \\ 
+  \hline
+  Recall & 0.697 \\ 
+  \hline
+  F-1 Score & 0.756 \\ 
+  \hline
+\end{tabular}
+\end{center}
+
+Figure 1 displays a confusion matrix of true positives, false positives, false negatives, and true negatives. The idea of the confusion matrix is to show whether the model tends to focus on accurately recommending everything that it should with a high precision (and also being too eager to recommend items it should have stayed away from) or whether the model tends to be correct when it recommends something with a high recall (at the expense of missing items it should have recommended). In recommendation, it makes sense to emphasize precision over recall because the displeasure of acting on a bad recommendation outweighs the displeasure of missing good recommendations. 
+
+FIXME insert conf matrix
+
+Figure 2 displays the test cases for recommendation. These are intuitive indicators of performance that provide insight into whether the model tends to be over- or under-eager to label specific games as 1 ("should be recommended"). Because most of the games are labeled as 1, the model captures most of the games it should recommend, but it also recommends games it should stay away from. This corresponds to the eagerness to label a product as 1 which makes sense for a recommender system. 
+
+Overall, the results make sense given the methodology used in the experiment. Both the table and the test cases suggest that precision is greater than recall - false positive count is less than false negative count. This implies that the model tends to be accurate when it labels a game as "recommend," but it misses good recommendations that it could have provided. In addition to conforming to the expectations of a recommender system, the trend towards precision over recall makes sense at the architectural level. The word embedding vectors of deck and description were key features in training the SVM. Because the algorithm is comparing possible recommendations through natural language features, it is more likely to recommend matches where the deck/description vectors have strong matches (higher precision), and it is also likely to be conservative in what it recommends if the natural language input does not clearly indicate a match between query $g$ and recommendation $r$ (lower recall).
+
+Even with its display of reduced recall, the natural language features used to train the model capture much of the variability of the dataset. Just by feeding in word embedding vectors of deck and description, the model is able to accurately reconstruct the GiantBomb API's recommendation scheme to an F-1 score of 0.7. Being able to beat the baseline model just with text features implies that text (whether matter-of-fact descriptions, reviews, or perhaps even more emotive text found on forums online) is a valuable feature for predicting game similarity.
+
+On the other hand, one of the limitations of the approaches used in this experiment is that natural language features may not only \textit{display} reduced recall, they may fundamentally \textit{imply} reduced recall.
+Even if two games have the same demographics (genre, theme, and franchise), the way in which they are described in their deck and description supersedes any demographic connection two games may have. This hesitance to connect two games purely on demographics means that the model will restrict its positive labels (1s) in favor of negative labels (0s), thus increasing precision at the cost of recall. For example, consider recommending given the first Super Mario Bros game given the original Donkey Kong arcade game. The genre (platformer) and franchise (Mario) are the same, but the descriptions may very significantly ("famous, influential arcade game" vs. "blockbuster home console video game"). In this way, an algorithm trained purely on word embeddings will miss what is otherwise an accurate recommendation. 
+
+To address this limitation, other NLP approaches like dependency parsing or sentiment analysis can be applied. \cite{Ryan_47} Addressing cases where demographics are similar but descriptions are different with sentiment analysis can help improve performance. For example, suppose Gran Turismo is posed as a recommendation for Mario Kart. Even without similar franchises or themes, if the descriptions for both discuss similar driving physics, fun to be played with friends, and so on, the algorithm can apply NLP techniques (e.g., connecting adjectives to nouns) to see if the embeddings for \textit{those} are more similar. \cite{Meidl} In this way, NLP techniques can reveal similarities in the word embedding spaces which the unedited text did not show.
+
+In general, the results meet the goals of the project. Because $SVM(g, r)$ simulates running $GB(g)$ and checking if $r \in S$ (where $S$ is a similar game set used to define good recommendations), it provides the desired output. Because the SVM captures much of the variability of the GiantBomb API using this approach, it is an appropriate reconstruction algorithm for the API. 
 
 \section{Ethical Considerations}
 
@@ -559,13 +586,15 @@ is forwarded to the algorithm.
 
 \end{comment}
 
-% The project is considered both in its complete technological and societal context. Issues of bias and diversity are explored in detail, and potential contributions to global and local inequity examined. Relevant literature is cited.
+Any machine learning project is subject to ethical considerations which need to be addressed. Because this project uses machine learning to reconstruct the GiantBomb API, mitigating data bias is essential. Furthermore, any project that uses natural language, free-text data needs to consider how to moderate and mitigate abusive content if it is found.
+
+Like any machine learning project, the model is only as good (or as biased) as the data on which it is trained. The SVM algorithm is trained on data from Metacritic, GameSpot, and GiantBomb. For the deck and description, the text data comes from verified reviewers who have write access to those websites. This content is less likely to be subject to bias, because it is a matter-of-fact text corpus that summarizes (without opinion) the content of a video game. For the review data, average video game players can submit review content. This content has more of a likelihood to skew the model because of "edge cases" like irony, misinformation, and speaker intention. \cite{Vidgen} To address this possibility, multiple different sources were used instead of only using the GiantBomb API.
+
+Abusive content in the free text reviews is also a possibility. Any application which uses natural language as a feature or outuputpossibly has to contend with abusive content, which includes (but is not limited to) hate speech, casual racism/sexism/other discrimination, etc. Care has to be taken to make sure that this sort of speech is not learned and casually amplified by the model. With more time, one way to check for this would be to use state-of-the-art methods of removing hate speech from the dataset. One way to do so is to perform a search to ensure that any provided input string is not found within a centralized, curated hate speech dataset. \cite{Mathew} This is not currently implemented, but is an important direction of future work that would be taken with more time. As important as moderation is, however, it is less necessary in a project like this where data is obtained from websites that are about game \textit{content} rather than game \textit{discussion}. For example, GameSpot has lots of news about game news, development, updates, and so on, but it has less places for users to congregate and chat about games. By contrast, forums such as Reddit which have more game \textit{discussion} are more likely to be vectors of this abusive content. This means that abusive content is less likely to be obtainable in this project, but it is still worth considering and implementing if more time was available.
 
 \section{Future Work, and Conclusion}
 
 \begin{comment}
-
-     FIXME
      moderate or standardize the descriptions used as input to the SVM. 
      
      Consider this:
@@ -593,6 +622,10 @@ is forwarded to the algorithm.
     
     
 \end{comment}
+
+Future work can improve the model performance by ensuring that the model does not propogate bias further in its output. In terms of ethical considerations, future work includes using standard approaches of abusive content detection \cite{Mathew} to process abusive content as needed. Even without ethical considerations, the way in which decks and descriptions are written is still subject to variability. Even amongst the same API, different authors may have written the text items in different ways, and this introduces a new layer of complexity. Future work could mitigate this uncertainty by getting deck and description elements for each game from different APIs (rather than just one API per game as in the current architecture). 
+
+Model training is another area where future work can continue to improve performance. Currently, word embedding vectors of deck and description are the influential features used to train the SVM algorithm. Future work could include dependency parsing approaches on different sorts of text to get a better sense of syntactic structure. \cite{LDiCaro} Instead of only considering adjective-noun pairs, further grammatical structure (adverb-verb pairs, other dependency tags, etc.) could be explored. Other features of sentiment analysis could also be used; topic modeling, sentiment analysis, and other feature extraction methods could also potentially improve performance. \cite{Ramzan, Ryan_51} Any NLP method that focuses on extraction or identification provides informatic features for the model to train on to further contextualize its word embedding focus.
 
 \section{Code Documentation}
 

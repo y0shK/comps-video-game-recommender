@@ -1,5 +1,10 @@
 """
-Supervised learning project to reverse engineer recommended games from GiantBomb API
+Supervised learning project to reverse engineer the similarity scheme of the GiantBomb API.
+Consider some query game g and some potential recommendation game r.
+Running SVM(g, r) simulates the following:
+    similar game set S = GiantBombAPI(g)
+    is r in S? return 1
+    else, return 0
 """
 import requests_cache
 import pdb
@@ -10,6 +15,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import random
+
+# https://stackoverflow.com/questions/52688019/how-do-i-download-en-for-spacy-using-conda
 import spacy
 from spacy.cli import download
 
@@ -22,7 +29,6 @@ from sklearn.metrics import f1_score, precision_score, recall_score
 import pandas as pd
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-
 from sklearn.decomposition import PCA
 from imblearn.over_sampling import SMOTE
 from collections import Counter
@@ -47,13 +53,6 @@ GIANTBOMB_API_KEY = os.getenv('GIANTBOMB_API_KEY')
 csv_titles_df = pd.read_csv("metacritic_game_info.csv")
 csv_reviews_df = pd.read_csv("metacritic_game_user_comments.csv")
 
-"""
-Test get associated review games
-"""
-#review_d = get_associated_review_games(gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
-#print("check review_d")
-#pdb.set_trace()
-
 print("Loading in spacy web model")
 download("en_core_web_sm")
 en_nlp = spacy.load("en_core_web_sm")
@@ -64,37 +63,22 @@ Get titles from each of the data sources, then get information from API calls
 """
 csv_titles = list(set([i for i in csv_titles_df['Title']][0:5]))
 
-#print(list(set([i for i in csv_reviews_df['Title']])))
-#pdb.set_trace()
-
-print(csv_titles[0])
-print(len(csv_titles))
-pdb.set_trace()
-
 # get reviews with respect to their csv titles
 title_review_lookup = {}
 
 for title in csv_titles:
     title_review_lookup[title] = ''
 
-pdb.set_trace()
-
 for row in csv_reviews_df.iterrows():
         if row[1]['Title'] in title_review_lookup:
                 title_review_lookup[row[1]['Title']] += row[1]['Comment']
 
-pdb.set_trace()
-
 query_set = {}
 for title in title_review_lookup:
     query_dict = get_giantbomb_game_info(api_key=GIANTBOMB_API_KEY, query=title, headers=HEADERS,session=session)
-    #pdb.set_trace()
     if title in query_dict.keys():
         query_dict[title]['review'] = title_review_lookup[title]
     query_set = {**query_set, **query_dict}
-
-print("check reviews")
-pdb.set_trace()
 
 # get gamespot games - (game_count * 99) games before filtering
 # get more games (depending on how many games in dataset also have gamespot reviews; 
@@ -104,10 +88,6 @@ gs_review_games = get_gamespot_associated_review_games(gamespot_key=GAMESPOT_API
 
 query_set = {**query_set, **gamespot_games}
 query_set = {**query_set, **gs_review_games}
-
-print("check query set")
-pdb.set_trace()
-
 print("dataset size: ", len(query_set))
 
 """
@@ -134,12 +114,10 @@ franchises_dict_0 = {}
 
 print("Length of dataset:")
 print(len(query_set))
-
 game_counter = 1
 review_len_limit = 5
 
 for k, v in query_set.items():
-
     # on a per game basis,
     # check similar games (which are recommended == 1 contingent on the query set game)
     # and check all other query set games (which are recommended == 0 since they are not similar)
@@ -151,7 +129,6 @@ for k, v in query_set.items():
     # e.g., SVM(initial = Breakout and rec = Tetris) = 1
     # SVM(initial = BG3 and rec = Tetris) = 0
     # use deck and description
-
     if check_valid_deck_and_desc(v['deck'], v['description']) == False:
         continue
 
@@ -215,9 +192,6 @@ for k, v in query_set.items():
         franchises_dict_1 = update_demographic_dict(current_franchise, franchises_dict_1)
 
     for nk, nv in query_set.items():
-
-        #print(nv)
-
         if nk in similar_games_instance:
             continue
 
@@ -280,26 +254,19 @@ for k, v in query_set.items():
     print("currently on iteration", game_counter)
     game_counter += 1
 
-print("check dataset X and y")
-pdb.set_trace()
-
 print("Original dataset shape")
 print(len(X))
 print(len(y))
 print(Counter(y))
 
-pdb.set_trace()
-
 sm = SMOTE(random_state=42)
 X_res, y_res = sm.fit_resample(X, y)
 
 print("Examine X and y of resample")
-pdb.set_trace()
 print(len(X_res))
 print(len(y_res))
 
 print("Resampled dataset shape")
-pdb.set_trace()
 print(Counter(y_res))
 
 # shuffle around X_res and y_res
@@ -316,9 +283,6 @@ for i in range(len(tuple_list)):
     X_res_shuffle[i] = tuple_list[i][0]
     y_res_shuffle[i] = tuple_list[i][1]
 
-print("check shuffle")
-pdb.set_trace()
-
 X_res = X_res_shuffle
 y_res = y_res_shuffle
 
@@ -329,9 +293,6 @@ y_train = np.array(y_res[0:split])
 X_test = np.array(X_res[split:])
 y_test = np.array(y_res[split:])
 
-print("check train test split")
-pdb.set_trace()
-
 samples = [X_train, X_test, y_train, y_test]
 sample_strings = ['X_train', 'X_test', 'y_train', 'y_test']
 for sample in samples:
@@ -340,7 +301,7 @@ for sample in samples:
 
 """
 3a. Perform dimensionality reduction with PCA to project the N-dimensional word embedding vectors onto R^2
-This will make the vectors easier to visualize to assess SVM performance
+This will make the nonlinear decision boundary simpler to create
 
 3b. Feed 2-D train and test set into SVM and evaluate the model.
 """
@@ -392,7 +353,6 @@ Goals:
     (We'll see N*k F-1 scores)
     2. isolate the specific C-value that leads to best performance
 """
-
 # perform hyperparameter tuning
 svc = SVC(gamma='auto', kernel='rbf')
 svm_hyperparams = {'svc__C':[1, 10, 100, 1000]} # for each k in k-fold validation, these hyperparams are compared
@@ -430,7 +390,7 @@ print("best index for those params: ")
 print(grid.best_index_)
 
 """
-4. Add some test cases for evaluation
+4. Add some test cases for intuition - is the model tending towards higher precision or recall? (can't be both)
 Fit PCA on a query and a similar game to the query.
 Then transform PCA on the proposed recommendation.
 Example runs:
@@ -448,7 +408,7 @@ run_testcase(query='Breakout', rec='Tetris', model=model, clf=clf, gamespot_key=
 # expected 0 - received 1
 run_testcase(query='Breakout', rec="Baldur's Gate", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
-# expected 1 - received 1
+# expected 1 - received 0
 run_testcase(query='Super Mario Bros', rec="The Great Giana Sisters", model=model, clf=clf, \
              gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
 
@@ -472,21 +432,12 @@ run_testcase(query="The Legend of Zelda: Ocarina of Time", rec="The Legend of Ze
 
 # expected 1 - received 1
 run_testcase(query="Super Mario Galaxy", rec="Super Mario Galaxy 2", model=model, clf=clf, gamespot_key=GAMESPOT_API_KEY, giantbomb_key=GIANTBOMB_API_KEY, headers=HEADERS, session=session)
-
-print("check testcases")
-pdb.set_trace()
+print("testcases complete!")
 
 # show double bar chart of game demographics
 create_histogram("Genres", genres_dict_0, genres_dict_1, 3)
 create_histogram("Themes", themes_dict_0, themes_dict_1, 3)
 create_histogram("Franchises", franchises_dict_0, franchises_dict_1, 3)
-
-print("check visualizations")
-pdb.set_trace()
-
-print("final pdb")
-pdb.set_trace()
-
 print("final time")
 finaltime = time.time() - start_time
 print("final time (min): ", finaltime/60)

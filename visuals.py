@@ -1,7 +1,6 @@
 """
 Make visuals (histograms of genre, theme, franchise)
 """
-
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import Counter
@@ -42,11 +41,9 @@ def create_histogram(demographic, dict0, dict1, topN):
     while len(common_g) < 4:
         topN += 1
         top_new = dict(Counter(tot).most_common(topN))  
-
         g0 = [k for k in top_new if k in dict0]
         g1 = [k for k in top_new if k in dict1]
         common_g = [k for k in g0 if k in g1]
-
 
     # remove "unknown" values
     unknown_key = "unknown"
@@ -56,7 +53,6 @@ def create_histogram(demographic, dict0, dict1, topN):
     d0 = {}
     for i in common_g:
         d0[i] = dict0[i]
-
     d1 = {}
     for i in common_g:
         d1[i] = dict1[i]
