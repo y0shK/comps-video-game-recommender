@@ -135,7 +135,7 @@ In both content-based approaches and collaborative filtering applications, recom
 
 In my comps project, the problem of recommendation is transformed from a collaborative filtering problem into a supervised learning problem. Because collaborative filtering requires millions of user profiles, any algorithm that uses collaborative filtering needs access to a robust user dataset. Instead, this project finds ground truth labels for recommendation from an online application programming interface (API) and builds a machine learning algorithm to perform well on the dataset. Thus, the problem turns from recommendation to \textit{reconstruction} of a recommendation algorithm via machine learning. The supervised learning problem is formulated as follows: Given an input game $g$, decide whether a potential recommendation game $r$ should be recommended.
 
-To solve this supervised learning problem, the support vector machine (SVM) algorithm is used. SVM is a binary classifier, so it discriminates between two classes. SVM creates a nonlinear decision boundary between points of these two classes (1s and 0s) such that distances from the margin are reduced as much as possible. \cite{CortesVapnikSVM} Cases with high class imbalances (where there are far more 0s than 1s, or vice versa) can be addressed by artificially creating similar points and adding those to the lesser class. \cite{NVChawla} The way that SVM is constructed combines optimal margin classification (reducing margin distances) and an efficient "kernel trick" which teaches the classifer how to map to nonlinear decision boundaries. By definition, the kernel trick helps SVM to work with high-dimensional data, which makes SVM particularly effective for problems that require high-dimensional inputs. \cite{Joachims, Berbatova} 
+To solve this supervised learning problem, the support vector machine (SVM) algorithm is used. SVM is a binary classifier, so it discriminates between two classes. SVM can create a linear decision boundary to differentiate two classes, but the kernel (the core behind the decision boundary SVM creates) that is used in this experiment is the radial basis function ("RBF") kernel. RBF is the standard for any nonlinear SVM classification. Using RBF, SVM creates a nonlinear decision boundary between points of these two classes (1s and 0s) such that distances from the margin are reduced as much as possible. \cite{CortesVapnikSVM} Cases with high class imbalances (where there are far more 0s than 1s, or vice versa) can be addressed by artificially creating similar points and adding those to the lesser class. \cite{NVChawla} The way that SVM is constructed combines optimal margin classification (reducing margin distances) and an efficient "kernel trick" which teaches the classifer how to map to nonlinear decision boundaries. By definition, the kernel trick helps SVM to work with high-dimensional data, which makes SVM particularly effective for problems that require high-dimensional inputs. \cite{Joachims, Berbatova} 
 
 The input to the SVM uses techniques from natural language processing (NLP) to transform textual data into numerical data that the machine learning model can use for training and testing. One possible NLP approach is to identify informatic words by topic modeling, where key ideas are extracted from a series of documents and used as ML features. \cite{Ryan_51, Reuver} A related, but distinct, approach is to identify informatic words by context/through their syntactic structure \cite{Meidl, LDiCaro}. Another technique is to use word embedding vectors or matrix/tensor representations of word embeddings, where words are mathematically transformed from strings to floats and represented in N-dimensional space. \cite{Sifa_tensor} These approaches rely on powerful ideas from linear algebra to turn informatic text content into numerical machine learning features.
 
@@ -269,9 +269,7 @@ A specific subset of ML and NLP approaches can help address the limitations of t
     Then created the dataset using the results of both API calls. (Combined into one big games dictionary)
     
     Iterate through games dictionary G. Let g be the current game being looked at in the games dictionary. Then get the similar games for g; call that set of similar games S. Iterate through S; store word embeddings of tokenized deck and description in X and mark each similar game (Y=1). Then iterate through all games in (G-S); store word embeddings of tokenized deck and description in X and mark each game in that iteration as Y=0.
-
-    FIXME put in sample input PNG
-
+    
     - Preprocessing.
 
     synthetic minority oversampling - there is a class imbalance (many more 0s than 1s). So, perform SMOTE to generate close points in N-space to balance out the classes for binary classification 
@@ -306,8 +304,6 @@ A specific subset of ML and NLP approaches can help address the limitations of t
     X.append(word_embedding)
     y.append(0 or 1)
 
-    FIXME put in example train and test PNG
-
     Why is word embedding used instead of TF-IDF? TF-IDF uses sparse word vectors, so the majority of the elements coming from the vectors are zero elements. (There are artificial positive matches between queries and potential recommendations because all vectors contain mostly 0s, so the overlap is the same even if the nonzero content is not.) By contrast, word embeddings use dense word vectors, so the majority of the elements are NOT zero elements.
 
     - Hyperparameter tuning
@@ -320,15 +316,13 @@ A specific subset of ML and NLP approaches can help address the limitations of t
     - SVM(query = Breakout, rec = Tetris) -> 1
     - SVM(query = Breakout, rec = Baldur's Gate) -> 0
 
-    FIXME put image of testcases from VSCode terminal
-
     This outcome meets the goal of the project. The idea is to use supervised learning techniques to create a ML model that can perform this recommendation task (i.e., given g and r, say if r is an appropriate recommendation for g). The testcases show sample outputs of the pipeline. 
     
 \end{comment}
 
 \subsection{Problem Formulation}
 
-I am reconstructing the GiantBomb API (specifically the GiantBomb similarity algorithm) by using a support vector machine algorithm trained on word embeddings of game descriptions. The GiantBomb API acts as follows: given a query game $g$, it gives a set of similar games $S$. For this project, for every $s \in S$, $s$ is considered a valid recommendation for $g$, and for every $n \not\in S$, $n$ is not a valid recommendation for $g$. So, $GB(g, s) = 1$, and $GB(g, n) = 0$. By using the GiantBomb similarity scheme as the ground truth data, the supervised learning algorithm reconstructs the GiantBomb similarity algorithm.
+I am reconstructing the GiantBomb API \cite{GiantBomb} (specifically the GiantBomb similarity algorithm) by using a support vector machine algorithm trained on word embeddings of game descriptions. The GiantBomb API acts as follows: given a query game $g$, it gives a set of similar games $S$. For this project, for every $s \in S$, $s$ is considered a valid recommendation for $g$, and for every $n \not\in S$, $n$ is not a valid recommendation for $g$. So, $GB(g, s) = 1$, and $GB(g, n) = 0$. By using the GiantBomb similarity scheme as the ground truth data, the supervised learning algorithm reconstructs the GiantBomb similarity algorithm.
 
 Thus, the problem statement is as follows. Given a query game $g$ and a potential recommendation $r$ as input, give output of whether the recommendation makes sense with respect to the query. 
 
@@ -361,11 +355,23 @@ Then the problem of recommendation has transformed into a problem of identifying
 
 \subsection{Dataset}
 
-Game titles were obtained from a combination of GameSpot API call and Metacritic CSV. These titles were fed into the GiantBomb API, and the response was a collection of demographics (genres, themes, franchises) and text (sentence-long taglines called "deck" and longer-form paragraph called "description"). The initial query set $Q$ links game titles to their demographics and deck/description. Reviews were also extracted from the Metacritic CSV and GameSpot API where they were available.
+Game titles were obtained from a combination of GameSpot API call \cite{GameSpot} and Metacritic CSV \cite{KaggleMetacritic}. These titles were fed into the GiantBomb API, and the response was a collection of demographics (genres, themes, franchises) and text (sentence-long taglines called "deck" and longer-form paragraph called "description"). The initial query set $Q$ links game titles to their demographics and deck/description. Reviews were also extracted from the Metacritic CSV and GameSpot API where they were available. Figure 1 provides a sample entry in the query set.
+
+%\includegraphics[width=\textwidth,height=\textheight, keepaspectratio]{sample_input_.PNG}
+
+% https://tex.stackexchange.com/questions/215708/fit-an-image-a-two-column-style
+% https://www.overleaf.com/learn/latex/Questions/How_do_I_insert_an_image_at_a_specific_point_in_the_document%3F
+% https://tex.stackexchange.com/questions/8625/force-figure-placement-in-text
+% https://www.overleaf.com/learn/latex/Inserting_Images
+\begin{figure}[h!]
+\includegraphics[width=8cm, height=6cm]{deck_desc_data_structure.PNG}
+\centering
+\caption{Sample entry in query set $Q$, mapping a game title to its text data and demographic categories}
+\end{figure}
 
 After forming the initial query set $Q$, the dataset for machine learning was built. For $g \in Q$, a set of similar games $S$ for $g$ were obtained from the GiantBomb API. Every similar game $s \in S$ to $g$ should be recommended (1). Similarly, every non-similar game $n \not\in S$ such that $n \in Q$ should not recommended (0). When reviews were available, adjective-context pairs were identified in the review text using dependency parsing and included as a feature. \cite{Meidl, LDiCaro} So, the word embedding vectors of deck and description (and adjective-context pairs, when available) formed the features of the dataset, and the label was either 0 or 1 depending on the game similarity.
 
-\subsection{Data processing}
+\subsection{Data Processing}
 Data processing was conducted to smooth out the results. To address class imbalances (far more non-similar games than similar games), synthetic minority oversampling was used. \cite{NVChawla} This technique generates points in N-dimensional space which are similar to the points already existing in the dataset so that the labels 0 and 1 are more balanced. For the SVM algorithm, dimensionality reduction was applied by principal component analysis. \cite{Joachims} Before fitting the SVM to the data, the dataset needed to be projected from an N-dimensional space to a 2-dimensional space using linear algebra. This technique ensured that the decision boundary formed between the two classes was more precise.
 
 \subsection{Algorithm}
@@ -377,9 +383,18 @@ For K-nearest neighbors, the goal is to cluster together related entities by pro
 
 Finally, tree-based models like random forest often require enumerably many features that are determined before model training. The idea of random forest is to create partitions that isolate one part of the dataset at a time. For example, one partition in a random forest could be "distance from the beach", where a distance greater than a certain amounts leads to a 0 label ("will not buy the house"). Every single partition in such a model is isolating certain cases. However, in this project, natural language (via deck and description) is the key feature. The variability and density of natural language makes it hard to isolate numerical, meaningful features ahead of time, so random forest cannot find meaningful partitions to use.
 
-Consequently, the SVM algorithm was the best choice for this specific use case. The algorithm was trained on the dimensionality-reduced dataset of word embedding vectors of deck/description. This dataset includes embeddings from both the query game $g$ and the potential recommendation $s \in S$ or $n \not\in S$. Word embeddings were chosen instead of TF-IDF because TF-IDF uses sparse word vectors (a majority of vector elements are 0s). If sparse vectors are used, there are artificial positive matches between query game vectors and potential recommendation game vectors because all vectors contain mostly 0s - there is overlap almost by definition. This leads to a non-discriminative classifier that is prepared to recommend everything. By contrast, word embeddings use dense word vectors, so the similarity can be constructed with respect to non-zero vector elements. 
+Consequently, the SVM algorithm was the best choice for this specific use case. The algorithm was trained on the dimensionality-reduced dataset of word embedding vectors of deck/description. Figure 2 displays X\_train and y\_train - the word embedding vectors in the image correspond to one label in the Y array. 
 
-\subsection{Hyperparameter tuning}
+\begin{figure}[h!]
+\includegraphics[width=8cm, height=6cm]{train_set_img.PNG}
+\centering
+\caption{Training dataset mapping word embedding vectors to labels}
+\end{figure}
+
+
+This dataset includes embeddings from both the query game $g$ and the potential recommendation $s \in S$ or $n \not\in S$. Word embeddings were chosen instead of TF-IDF because TF-IDF uses sparse word vectors (a majority of vector elements are 0s). If sparse vectors are used, there are artificial positive matches between query game vectors and potential recommendation game vectors because all vectors contain mostly 0s - there is overlap almost by definition. This leads to a non-discriminative classifier that is prepared to recommend everything. By contrast, word embeddings use dense word vectors, so the similarity can be constructed with respect to non-zero vector elements. 
+
+\subsection{Hyperparameter Tuning}
 Hyperparameters are parameters used in model training which can be adjusted to tweak performance. They are not fundamentally related to the dataset, but they do change some aspect of the model which can slightly boost performance. 
 
 The hyperparameter of interest for SVM is the C-value, which is inversely proportional to the tightness of fit of the decision boundary. How well does the model trade off between effectively fitting the training data and remaining general enough for effectively fitting the test data? A lower C-value means that the model has a better fit on the data, but it becomes more likely to overfit on test data. By contrast, a higher C-value means that the model has a worse fit on the data, but it becomes less likely to overfit on test data. The idea of tuning the C-value is to find the optimal point between a good fit and generality.
@@ -493,20 +508,13 @@ With more time and resources, the goal for the project would be a machine learni
 
 \begin{comment}
 
-    Precision: 0.774
-    Recall: 0.644
-    F-1: 0.703
+    Precision: 0.825
+    Recall: 0.697
+    F-1: 0.756
     Confusion matrix attached
 
-    FIXME show confusion matrix
-
     Testcase performance:
-    2 out of 3 passed 
-
-    UPDATE - 3 out of 7 passed
-    Breakout - Tetris - 1 - green
-    Breakout - BG - 1 - red
-    Super Mario Bros - The Great Giana Sisters - 1 - green
+    4 out of 10 passed (tends towards high FP)
 
     Results make sense given methods. The metrics indicate that precision is greater than recall, implying that FP is less than FN. So, the model makes the trade-off of being more correct when its prediction is "recommendation" (lower FP) at the cost of missing some valid recommendations in total (higher FN). This makes sense when considering the training method - word embeddings of deck and description for both query and potential recommendation were used to train the SVM. So, the algorithm is more likely to hesitate if the natural language input does not clearly indicate a match between q and r, improving its precision at the cost of its recall.
 
@@ -538,11 +546,37 @@ Table 1 displays the standard ML metrics for this project.
 \end{tabular}
 \end{center}
 
-Figure 1 displays a confusion matrix of true positives, false positives, false negatives, and true negatives. The idea of the confusion matrix is to show whether the model tends to focus on accurately recommending everything that it should with a high precision (and also being too eager to recommend items it should have stayed away from) or whether the model tends to be correct when it recommends something with a high recall (at the expense of missing items it should have recommended). In recommendation, it makes sense to emphasize precision over recall because the displeasure of acting on a bad recommendation outweighs the displeasure of missing good recommendations. 
+Figure 3 displays a confusion matrix of true positives, false positives, false negatives, and true negatives. The idea of the confusion matrix is to show whether the model tends to focus on accurately recommending everything that it should with a high precision (and also being too eager to recommend items it should have stayed away from) or whether the model tends to be correct when it recommends something with a high recall (at the expense of missing items it should have recommended). In recommendation, it makes sense to emphasize precision over recall because the displeasure of acting on a bad recommendation outweighs the displeasure of missing good recommendations. 
 
-FIXME insert conf matrix
+\begin{figure}[h!]
+\includegraphics[width=8cm, height=6cm]{conf_matrix_visual.png}
+\centering
+\caption{Matrix illustrating trade-off between precision and recall (more TP implies more FP)}
+\end{figure}
 
-Figure 2 displays the test cases for recommendation. These are intuitive indicators of performance that provide insight into whether the model tends to be over- or under-eager to label specific games as 1 ("should be recommended"). Because most of the games are labeled as 1, the model captures most of the games it should recommend, but it also recommends games it should stay away from. This corresponds to the eagerness to label a product as 1 which makes sense for a recommender system. 
+Figure 4 displays the test cases for recommendation. These are intuitive indicators of performance that provide insight into whether the model tends to be over- or under-eager to label specific games as 1 ("should be recommended"). Because most of the games are labeled as 1, the model captures most of the games it should recommend, but it also recommends games it should stay away from. This corresponds to the eagerness to label a product as 1 which makes sense for a recommender system. 
+
+\begin{figure}[h!]
+\includegraphics[width=10cm, height=2cm]{testcases_hyperparams_img.PNG}
+\centering
+\caption{Qualitative test cases to assess if model tends towards either precision or recall (keeping trade-off in mind)}
+\end{figure}
+
+The results of hyperparameter tuning were also applied to further improve performance. Since the RBF kernel was used to create a nonlinear decision boundary, hyperparameter tuning was applied to different C-values (1, 10, 100, and 1000) to compare relative performances. A new SVM was created and fitted using 5-fold cross validation to compare the C-values across 5 different iterations. In every iteration, C=1000 performed the best. Table 2 displays the F-1 score of each C-value for these different iterations.
+
+\begin{center}
+\begin{tabular}{ | m{5em} | m{1cm} | m{1cm}| m{1cm} | } 
+  \hline
+  C=1 & 0.739 & 0.733  & 0.743 & 0.732 & 0.741 \\ 
+  \hline
+  C=10 & 0.743 & 0.739 & 0.747 & 0.737 & 0.748 \\ 
+  \hline
+  C=100 & 0.746 & 0.744 & 0.751 & 0.740 & 0.751 \\ 
+  \hline
+  C=1000 & 0.750 & 0.747 & 0.756 & 0.743 & 0.755 \\
+  \hline
+\end{tabular}
+\end{center}
 
 Overall, the results make sense given the methodology used in the experiment. Both the table and the test cases suggest that precision is greater than recall - false positive count is less than false negative count. This implies that the model tends to be accurate when it labels a game as "recommend," but it misses good recommendations that it could have provided. In addition to conforming to the expectations of a recommender system, the trend towards precision over recall makes sense at the architectural level. The word embedding vectors of deck and description were key features in training the SVM. Because the algorithm is comparing possible recommendations through natural language features, it is more likely to recommend matches where the deck/description vectors have strong matches (higher precision), and it is also likely to be conservative in what it recommends if the natural language input does not clearly indicate a match between query $g$ and recommendation $r$ (lower recall).
 
@@ -627,10 +661,6 @@ Future work can improve the model performance by ensuring that the model does no
 
 Model training is another area where future work can continue to improve performance. Currently, word embedding vectors of deck and description are the influential features used to train the SVM algorithm. Future work could include dependency parsing approaches on different sorts of text to get a better sense of syntactic structure. \cite{LDiCaro} Instead of only considering adjective-noun pairs, further grammatical structure (adverb-verb pairs, other dependency tags, etc.) could be explored. Other features of sentiment analysis could also be used; topic modeling, sentiment analysis, and other feature extraction methods could also potentially improve performance. \cite{Ramzan, Ryan_51} Any NLP method that focuses on extraction or identification provides informatic features for the model to train on to further contextualize its word embedding focus.
 
-\section{Code Documentation}
-
-This section will demonstrate that you have thought through the basics of how your code will work. You should include a diagram of the overall data flow of your program, including what the inputs and outputs of each component will be, and how they will be represented.
-
 % Dataset constructed from name/deck/description/genre/theme/franchise obtained from API call
 
 % Let q be the query game, and let r be the potential recommendation given the query. Let S be the set of similar games for q as obtained from GiantBomb. Then,
@@ -642,7 +672,77 @@ This section will demonstrate that you have thought through the basics of how yo
 % Input: q, r
 % SVM(q, r) -> 0 or 1
 
-\section{Appendices}
+\appendix
+
+\section{Replication Instructions}
+% All software used by the project is listed, with instructions that successfully allow another CS student to execute it. Particular attention is paid to future-proving the instructions (eg. package version, VMs, etc.)
+
+\subsection{Software Used}
+Key software used by the project is listed below.
+
+\begin{itemize}
+\item spacy=3.7.2 (for dependency parsing analysis of adjective/context word pairs)
+\item tensorflow=2.14.0 and tensorflow-hub=0.15.0 (setting up the TensorFlow Universal Sentence Encoder for word embedding vector generation)
+\item imbalanced-learn=0.11.0 (performing synthetic minority oversampling to offset class imbalance)
+\item pandas=1.5.3 (setting up DataFrames)
+\item numpy=1.25.0 (using numpy arrays for word embedding data types)
+\item scikit-learn=1.2.2 (for the SVM algorithm, pipeline, evaluation, etc.)
+\end{itemize}
+
+\subsection{How to Run}
+
+% https://www.overleaf.com/learn/latex/Hyperlinks
+\begin{itemize}
+    \item obtain API keys from \href{https://www.giantbomb.com/api/}{GiantBomb} and \href{https://www.gamespot.com/api/}{GameSpot}
+    \item navigate to a directory on your computer, and run: 
+    git clone https://github.com/y0shK/comps-video-game-recommender.git
+    \item create .env in the same directory as recommendation.py by using the following command: touch .env
+    \item put API keys into .env
+    \item download metacritic\_game\_info.csv and metacritic\_game\_user\_comments.csv from \href{https://www.kaggle.com/datasets/dahlia25/metacritic-video-game-comments}{Kaggle}, and put both files in same directory as recommendation.py
+    \item create conda environment in the same directory
+    \item run:
+    conda create --name YOUR\_ENV --file requirements.txt
+    \item run:
+    python recommender.py
+\end{itemize}
+
+\section{Code Architecture}
+%The code is organized logically, with comments on complicated algorithms. The organization of the code is clearly laid out/diagrammed, with justification. Another developer could use the overview to extend or debug the project.
+
+%The code is split up into three main parts; dataset, algorithm, and postprocessing/data exploration. 
+
+\subsection{Dataset}
+
+\subsubsection{Initial setup}
+
+Relevant imports are made (as described in the Replication Instructions section). For the data, requests session for API calls is created and CSV files for Metacritic data are read in. A web model for Spacy dependency parsing through adjective/context word pairs is also instantiated.
+
+\subsubsection{Data collection}
+
+From the CSV titles, game titles along with reviews, deck/description, and demographic information are obtained. This hash table of reviews is joined with API call data (from GameSpot and GiantBomb) to form the query set of data.
+
+\subsubsection{Dataset collation}
+The TensorFlow Sentence Encoder is set up for word embedding generation. Iterating through the query set, the query game $g$ is mapped to every possible recommendation $r$. The API is called to generate $S$, where S is a set of "similar games" to $g$. Then checking if $r \in S$ maps the word embedding vectors of deck/description for both $g$ and $r$ to 0 (not similar) or 1 (similar). Adjective-context word pairs are also found using Spacy dependency parsing, and key words of adjectives and their respective nouns are fed into the string that is converted to a word embedding. If reviews are present in the current $g$ or $r$, they are tokenized and added to the string before word embedding as well.
+
+\subsection{Algorithm}
+
+\subsubsection{Synthetic minority oversampling}
+
+To offset the class imbalance, synthetic minority oversampling \cite{NVChawla} is used to generate similar points in N-space. Upon resampling, the data is shuffled to prepare for training.
+
+\subsubsection{Training}
+
+The dataset is split into train and test with an 80-20 split. An SVM instance is created by using principal component analysis so that the decision boundary is simpler. The SVM model is trained on the train set.
+
+\subsubsection{Evaluation}
+
+The SVM model is evaluated on the test set. A confusion matrix is generated to visualize the tradeoff between precision and recall.
+
+\subsection{Postprocessing}
+
+\subsubsection{Data exploration}
+Hyperparameter tuning is conducted by creating a new SVM classifier and varying C-values. 5-fold cross validation is used and results are compared. Test cases are then run, and visuals are created to get a sense of the demographic characteristics of the dataset.
+
 
 \printbibliography
 
